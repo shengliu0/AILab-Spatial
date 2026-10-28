@@ -127,5 +127,5 @@ fun LabSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float
 /** On/off as one big toggle chip (✓ when on): the SpatialUI Switch is a small target for gaze. */
 @Composable
 fun LabSwitch(label: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Chip(selected = checked && enabled, onClick = { if (enabled) onChange(!checked) }, enabled = enabled, content = { Text(if (checked) "✓ $label" else label) })
+    Chip(selected = checked && enabled, onClick = { if (enabled) onChange(!checked) }, enabled = enabled, kind = "switch", content = { Text(if (checked) "✓ $label" else label) })
 }

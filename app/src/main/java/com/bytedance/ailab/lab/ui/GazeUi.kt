@@ -43,6 +43,16 @@ import com.pico.spatial.ui.foundation.hover.spatialHoverEffect
 import com.pico.spatial.ui.foundation.hover.tween
 import com.pico.spatial.ui.graphics.SpatialHoverStyle
 
+/**
+ * Test hook (SelectionHighlightTest): while [recording], every Chip composed appends what it shows, so a test can
+ * click each option and check that the option then shows as selected. Off on the device.
+ */
+object ChipProbe {
+    class Entry(val kind: String, val selected: Boolean, val enabled: Boolean, val onClick: () -> Unit)
+    @Volatile var recording = false
+    val entries = ArrayList<Entry>()
+}
+
 /** Minimum height of every interactive control (dp). */
 const val GAZE_TARGET_DP = 76
 /** Invisible extra hit area above and below each chip (dp); rows space chips by 12 - 2 x this less. */
@@ -110,24 +120,26 @@ fun RowScope.SegmentItem(
     modifier: Modifier = Modifier,
     title: @Composable () -> Unit = {},
 ) {
-    Chip(selected, onClick, modifier, title)
+    Chip(selected, onClick, modifier, title, kind = "segment")
 }
 
 /** A big button (drop-in for the SpatialUI Button's `Button(onClick) { content }` form). */
 @Composable
 fun Button(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable () -> Unit) {
-    Chip(selected = false, onClick = { if (enabled) onClick() }, modifier = modifier, content = content, outlined = true, enabled = enabled)
+    Chip(selected = false, onClick = { if (enabled) onClick() }, modifier = modifier, content = content, outlined = true, enabled = enabled, kind = "button")
 }
 
 @Composable
 internal fun Chip(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier,
-                  content: @Composable () -> Unit, outlined: Boolean = false, enabled: Boolean = true) {
+                  content: @Composable () -> Unit, outlined: Boolean = false, enabled: Boolean = true, kind: String = "chip") {
+    val click = { onClick(); com.bytedance.ailab.lab.LabHost.touchUi() }   // what a pinch on this chip runs
+    if (ChipProbe.recording) ChipProbe.entries += ChipProbe.Entry(kind, selected, enabled, click)
     val shape = RoundedCornerShape((GAZE_TARGET_DP / 2).dp)
     Box(
         modifier = modifier
             // the hit area is the full RECTANGLE (+6 dp above and below for the vertical gaze offset):
             // no clip layer — the PICO hit test checks a clip's rounded outline, which shaved the ends
-            .gazeClick(onClick = onClick)
+            .gazeClick(onClick = click)
             .padding(vertical = HIT_SLOP_DP.dp)
             .heightIn(min = GAZE_TARGET_DP.dp)
             .defaultMinSize(minWidth = 112.dp)

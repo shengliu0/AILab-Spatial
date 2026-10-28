@@ -153,7 +153,7 @@ object LessonRunner {
                     poll = 0f
                     val p = runCatching { c.progress() }.getOrDefault("")
                     if (p != challengeText) { challengeText = p; epoch++ }
-                    if (runCatching { c.done() }.getOrDefault(false)) { phase = Phase.FINISHED; epoch++ }
+                    if (runCatching { c.done() }.getOrDefault(false)) { phase = Phase.FINISHED; epoch++; Sfx.play(Sfx.CHIME, 0.7f, 1.26f) }
                 }
             }
             else -> {}
@@ -161,6 +161,7 @@ object LessonRunner {
     }
 
     private fun complete(s: LessonStep) {
+        Sfx.play(Sfx.CHIME, 0.45f, 1.0f)
         val ins = s.insight
         if (ins == null) { advance(); return }
         insightText = (if (s.reveal) verdict().let { if (it.isEmpty()) "" else it + "\n" } else "") + ins.text

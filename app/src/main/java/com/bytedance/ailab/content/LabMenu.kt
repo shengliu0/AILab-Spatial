@@ -108,6 +108,9 @@ fun LabTopBar(onPick: (String) -> Unit) {
         Button(onClick = { LabSettings.cycleScale() }, modifier = Modifier.height(BIG)) {
             Text(tr("大小 ", "Size ") + "${(LabSettings.scale * 100).toInt()}%", maxLines = 1, style = PicoTheme.typography.bodyLarge.copy(fontSize = 26.sp))
         }
+        Button(onClick = { LabSettings.toggleSound() }, modifier = Modifier.height(BIG)) {
+            Text(if (LabSettings.soundOn) tr("🔊 声音", "🔊 Sound") else tr("🔇 静音", "🔇 Muted"), maxLines = 1, style = PicoTheme.typography.bodyLarge.copy(fontSize = 26.sp))
+        }
         Button(onClick = { LabSettings.cyclePanel() }, modifier = Modifier.height(BIG)) {
             Text(tr("面板：", "Panel: ") + when (LabSettings.panelPos) {
                 LabSettings.PANEL_LEFT -> tr("左", "left"); LabSettings.PANEL_RIGHT -> tr("右", "right"); else -> tr("下", "bottom")

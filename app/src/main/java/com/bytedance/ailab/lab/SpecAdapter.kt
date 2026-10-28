@@ -43,6 +43,8 @@ class SpecAdapter {
     fun release() {
         for (r in meshCache.values) runCatching { r.close() }
         for (r in texCache.values) runCatching { r.close() }
+        for (r in sharedMats.values) runCatching { r.close() }
+        sharedMats.clear(); matShared.clear(); matKey.clear()
         meshCache.clear(); texCache.clear(); twins.clear(); pending.clear(); dirty.clear()
         ent.clear(); seen.clear(); mats.clear(); matKind.clear()
     }
@@ -148,6 +150,10 @@ class SpecAdapter {
      * culled, so whichever side faces the viewer reads correctly.
      */
     private val twins = IdentityHashMap<MeshData, MeshData>()
+    private data class TwinKey(val m: Mat)
+    private val sharedMats = HashMap<Any, Material>()
+    private val matShared = IdentityHashMap<Node, Boolean>()
+    private val matKey = IdentityHashMap<Node, Any>()
     private fun isTextQuad(md: MeshData, m: Mat) = md.vertexCount == 4 && md.idx.size == 6 && m is Mat.Unlit && m.tex != null && m.blend != Blend.OPAQUE
     private fun twinOf(md: MeshData): MeshData = twins.getOrPut(md) { MeshData(FloatArray(24), FloatArray(24), FloatArray(16), IntArray(12)) }.also { fillTwin(md, it) }
     private fun fillTwin(md: MeshData, t: MeshData) {
@@ -186,10 +192,19 @@ class SpecAdapter {
         }
         val kind = kindOf(m) + if (twin) "T" else ""
         val existing = mats[n]
-        val mat: Material = if (existing != null && matKind[n] == kind) { update(existing, m); existing }
-                            else create(m).also { mats[n] = it; matKind[n] = kind
-                                // each face of a two-faced text quad shows only to its own side
-                                if (twin) (it as UnlitMaterial).setCullingMode(com.pico.spatial.core.ecs.resource.MaterialCullingMode.BACK) }
+        fun fresh(): Material = create(m).also { if (twin) (it as UnlitMaterial).setCullingMode(com.pico.spatial.core.ecs.resource.MaterialCullingMode.BACK) }
+        // MATERIALS: one SDK material per distinct (Mat, twin) value, SHARED by every node that looks the same —
+        // per-node materials reached 1000+ per app on the Swan ("requested too many resources, there may be
+        // resource leakage"). Shared ones are global and closed in [release]. A node whose material CHANGES gets
+        // its own private material from then on, updated in place (colour animations make no new materials).
+        val key: Any = if (twin) TwinKey(m) else m
+        val mat: Material = when {
+            existing != null && matShared[n] == true && matKey[n] == key -> existing          // mesh-only change
+            existing == null -> sharedMats.getOrPut(key) { fresh().also { it.toGlobal() } }.also { matShared[n] = true; matKey[n] = key }
+            matKind[n] == kind && matShared[n] != true -> { update(existing, m); existing }
+            else -> fresh().also { matShared[n] = false }
+        }
+        mats[n] = mat; matKind[n] = kind
         val mc = e.components[ModelComponent::class.java]
         if (mc == null || existing !== mat) e.components.set(ModelComponent(mr, mat))
         else if (meshChanged) mc.mesh = mr

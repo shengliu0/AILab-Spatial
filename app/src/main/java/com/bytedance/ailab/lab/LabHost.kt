@@ -332,6 +332,9 @@ object LabHost {
     /** Bumped on every pinch / panel target, so the panel re-reads the demo's state immediately. */
     var uiEpoch by mutableStateOf(0)
         private set
+    /** Any panel click: re-read the demo's state, so a just-chosen option lights up even when the demo keeps
+     *  its selection in a plain (non-Compose) field (users saw 10⁶ / 10⁸ / 10¹⁰ chosen but not highlighted). */
+    fun touchUi() { uiEpoch++ }
 
     /**
      * A pinch on an object ([fromPanel] = false) or its panel twin. Besides running the demo's action,
@@ -347,6 +350,7 @@ object LabHost {
             uiEpoch++
             val at = d.anchorOf(name)
             toastText = "⚠ " + (tt.why?.text ?: tr("现在不可用", "Not available right now"))
+            Sfx.play(Sfx.DENY, 0.5f, pan = (d.anchorOf(name)?.get(0) ?: 0f))
             Log.i("LabTap", "${d.id} tap $name via ${if (fromPanel) "panel" else "pinch"} -> disabled")
             if (at != null) toastEntity?.let { e ->
                 val k = LabSettings.scale
@@ -356,6 +360,7 @@ object LabHost {
             return
         }
         d.onTap(name)
+        Sfx.play(Sfx.TAP, 0.35f, pan = (d.anchorOf(name)?.get(0) ?: 0f))
         uiEpoch++
         d.flash(name)
         val msg = d.tapMessage(name) ?: d.tapTargets.firstOrNull { it.node == name }?.let { "✓ " + tr(it.zh, it.en) }

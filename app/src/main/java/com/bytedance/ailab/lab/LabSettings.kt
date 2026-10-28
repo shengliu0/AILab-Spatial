@@ -25,6 +25,10 @@ object LabSettings {
         private set
     var aboutOpen by mutableStateOf(false)
         private set
+    /** Sound effects on/off (top bar), remembered. */
+    var soundOn by mutableStateOf(true)
+        private set
+    fun toggleSound() { soundOn = !soundOn; Sfx.enabled = soundOn; prefs?.edit()?.putBoolean("sound", soundOn)?.apply() }
 
     val scale: Float get() = SCALES[scaleIdx.coerceIn(0, SCALES.size - 1)]
 
@@ -32,6 +36,7 @@ object LabSettings {
         prefs = context.getSharedPreferences("lab", Context.MODE_PRIVATE)
         scaleIdx = (prefs?.getInt("scale", 0) ?: 0).coerceIn(0, SCALES.size - 1)
         panelPos = (prefs?.getInt("panel", PANEL_BOTTOM) ?: PANEL_BOTTOM).coerceIn(0, 2)
+        soundOn = prefs?.getBoolean("sound", true) ?: true; Sfx.enabled = soundOn
     }
 
     fun cycleScale() { scaleIdx = (scaleIdx + 1) % SCALES.size; prefs?.edit()?.putInt("scale", scaleIdx)?.apply() }

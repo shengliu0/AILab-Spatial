@@ -101,6 +101,7 @@ fun LabVolume(firstDemo: String) {
     remember(context) { Narrator.init(context); 0 }
     // demos read shipped files (trained weights) through LabAssets: here, from the APK
     remember(context) { LabAssets.open = { path -> runCatching { context.assets.open(path).use { it.readBytes() } }.getOrNull() }; 0 }
+    remember(context) { com.bytedance.ailab.lab.Sfx.init(context); 0 }
 
     val density = LocalDensity.current
     val lengths = LocalPhysicalLengthConverter.current
