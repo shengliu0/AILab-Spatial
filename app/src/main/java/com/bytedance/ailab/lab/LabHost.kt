@@ -95,6 +95,37 @@ object LabHost {
     /** Set by the debug broadcast; LabVolume observes it and calls [switchTo]. */
     var requested by mutableStateOf<String?>(null)
 
+    /**
+     * DEVICE STRESS TEST (debug broadcast `--es stress 1`): visits every demo and pinches each of its targets
+     * [STRESS_REPEAT] times in a row (the users' crash pattern), a few frames apart, logging "STRESS …". The JVM
+     * MonkeyTest cannot see SDK resource-lifetime crashes; this runs the same abuse on the real SDK.
+     */
+    var stressRequested = false
+    private var stressQueue: ArrayDeque<String>? = null
+    private var stressTargets: ArrayDeque<String> = ArrayDeque()
+    private var stressReps = 0; private var stressWait = 0; private var stressPresses = 0
+    private const val STRESS_REPEAT = 12
+    private fun stressTick() {
+        if (stressRequested) {
+            stressRequested = false; stressQueue = ArrayDeque(demos.map { it.id }); stressPresses = 0
+            Log.i("STRESS", "start: ${demos.size} demos"); stressTargets.clear(); stressWait = 0
+        }
+        val q = stressQueue ?: return
+        if (loading) return
+        if (stressWait > 0) { stressWait--; return }
+        val d = current ?: return
+        if (stressTargets.isEmpty() && stressReps == 0) {
+            if (d.id != q.firstOrNull()) { requested = q.firstOrNull() ?: run { stressQueue = null; Log.i("STRESS", "DONE: $stressPresses presses, no crash"); return }; stressWait = 120; return }
+            stressTargets = ArrayDeque(d.tapTargets.map { it.node }); q.removeFirst()
+            Log.i("STRESS", "${d.id}: ${stressTargets.size} targets")
+            if (stressTargets.isEmpty()) return
+        }
+        val t = stressTargets.firstOrNull() ?: return
+        onTap(t, fromPanel = true); stressPresses++
+        stressWait = 2 + stressReps % 4
+        if (++stressReps >= STRESS_REPEAT) { stressReps = 0; stressTargets.removeFirst(); stressWait = 30; Log.i("STRESS", "${d.id} $t ok") }
+    }
+
     /** Catalogue open: the scene is hidden so the cards have the user's whole attention. */
     var catalogOpen by mutableStateOf(false)
         private set
@@ -263,6 +294,7 @@ object LabHost {
         val d = current ?: return
         if (loading) return
         tickToast(dt)
+        stressTick()
         LessonRunner.tick(dt)
         billboardProbe(dt)
         val t0 = System.nanoTime()

@@ -66,6 +66,27 @@ class MonkeyTest {
             }
             println("MONKEY ${d.id}: ${if (bad.none { it.startsWith(d.id + ":") }) "ok" else "FAILED"}")
         }
+        // HAMMER: the user's crash pattern — the same button pinched again and again, in every review state
+        var hammered = 0
+        for (d in DemoRegistry.all.filterIsInstance<SpecDemo>()) {
+            val states = listOf<Pair<String, () -> Unit>>("default" to {}) + d.reviewVariants().toList()
+            for ((st, apply) in states) {
+                d.runHeadless(cache, 0.3f); apply(); repeat(10) { d.update(1f / 60f) }
+                for (t in d.tapTargets.map { it.node }) {
+                    try {
+                        repeat(15) { k ->
+                            if (d.tapTargets.none { it.node == t }) return@repeat
+                            d.onTap(t); hammered++
+                            repeat(1 + (k * 7) % 5) { d.update(1f / 72f) }
+                        }
+                        repeat(30) { d.update(1f / 72f) }
+                    } catch (e: Throwable) {
+                        bad += "${d.id} [$st] hammering $t: ${e::class.simpleName}: ${e.message}\n    at " + e.stackTrace.take(4).joinToString("\n    at ")
+                    }
+                }
+            }
+        }
+        println("MONKEY hammer: $hammered repeated presses")
         println("MONKEY $actions actions, problems: ${if (bad.isEmpty()) "none" else bad.size}")
         assertTrue(bad.joinToString("\n"), bad.isEmpty())
     }

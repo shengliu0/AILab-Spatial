@@ -39,6 +39,14 @@ class SpecAdapter {
      */
     fun build(root: Node): Entity { streaming = true; sync(root); return ent[root]!! }
 
+    /** After the demo's entities are destroyed: close every mesh / texture this adapter created (they are global). */
+    fun release() {
+        for (r in meshCache.values) runCatching { r.close() }
+        for (r in texCache.values) runCatching { r.close() }
+        meshCache.clear(); texCache.clear(); twins.clear(); pending.clear(); dirty.clear()
+        ent.clear(); seen.clear(); mats.clear(); matKind.clear()
+    }
+
     private var streaming = false
     private val pending = ArrayList<Node>()
     /** Meshes still waiting to be uploaded (0 = scene complete). */
@@ -169,6 +177,10 @@ class SpecAdapter {
         val mr = meshCache[md] ?: run {
             val t0 = System.nanoTime()
             com.pico.spatial.core.ecs.resource.MeshResource.createWithMeshModel(toModel(md), boundsFor(md), "m${meshSeq++}").also {
+                // GLOBAL, like textures: a local mesh is closed by the SDK when its ModelComponent switches to another
+                // mesh, and switching BACK to the cached handle crashed ModelComponent.setMesh (Galton tilt, pinched
+                // a few times). This adapter owns every resource it creates and closes them all in [release].
+                it.toGlobal()
                 meshCache[md] = it; statMeshN++; statMeshNs += System.nanoTime() - t0
             }
         }

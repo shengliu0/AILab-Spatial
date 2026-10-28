@@ -141,6 +141,7 @@ abstract class SpecDemo : Demo {
         val r = withContext(Dispatchers.Default) { buildSpec(ctx.cacheDir) }
         val t1 = System.nanoTime()
         root = r
+        adapter?.release()
         val a = SpecAdapter(); adapter = a
         update(0f)
         val e = a.build(r)
@@ -166,7 +167,7 @@ abstract class SpecDemo : Demo {
     /** Push an in-place edit of a MeshData (same instance) to the GPU. */
     protected fun meshEdited(md: com.bytedance.ailab.render.MeshData) { adapter?.refreshMesh(md) }
 
-    override fun dispose() { root = null; adapter = null; labels.clear() }
+    override fun dispose() { adapter?.release(); root = null; adapter = null; labels.clear() }
 
     /**
      * TAP-TARGET SELF-CHECK (device only, once, 2 s after build). For every gaze+pinch target, cast

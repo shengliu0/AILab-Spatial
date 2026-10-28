@@ -25,6 +25,7 @@ class SpatialApplication : Application() {
             val main = Handler(Looper.getMainLooper())
             registerReceiver(object : BroadcastReceiver() {
                 override fun onReceive(c: Context, i: Intent) {
+                    if (i.getStringExtra("stress") != null) { main.post { LabHost.stressRequested = true }; return }
                     val id = i.getStringExtra("demo") ?: return
                     Log.i("LabHost", "debug switch -> $id")
                     main.post { LabHost.requested = id }
