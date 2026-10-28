@@ -63,8 +63,13 @@ class SpecAdapter {
     private var syTf = 0; private var syVis = 0; private var syFrames = 0; private var syWorstNs = 0L; private var syWorstTf = 0
     private var syTfTotal = 0L; private var syT0 = 0L
 
+    /** Entities still to be created (a demo assembles over several frames; see [CREATE_BUDGET_NS]). */
+    private var assembling = true
+    val complete: Boolean get() = !assembling && pending.isEmpty()
+
     fun sync(root: Node) {
         val sy0 = System.nanoTime(); syTf = 0; syVis = 0
+        var skipped = false
         fun rec(n: Node, parent: Entity?) {
             var e = ent[n]
             // a hidden subtree that already exists: nothing it does is visible, so skip its transform/mesh writes
@@ -75,6 +80,9 @@ class SpecAdapter {
                 return
             }
             if (e == null) {
+                // creating an entity costs ~1.3 ms on the Swan (a 500-node lab = 0.7 s): only within the budget,
+                // the rest next frame (rec revisits uncreated nodes every sync)
+                if (assembling && parent != null && System.nanoTime() - sy0 > CREATE_BUDGET_NS) { skipped = true; return }
                 e = Entity().apply { setName(safeName(n.name)) }
                 ent[n] = e; seen[n] = Seen()
                 parent?.addChild(e)
@@ -108,6 +116,7 @@ class SpecAdapter {
             for (c in n.children) rec(c, e)
         }
         rec(root, null)
+        if (assembling && !skipped) { assembling = false; Log.i("SpecAdapter", "entities complete") }
         val buildPass = streaming
         streaming = false
         if (!buildPass) flushPending()                         // the build frame itself only creates what is cheap
@@ -148,7 +157,7 @@ class SpecAdapter {
         }
     }
 
-    private fun applyModel(n: Node, e: Entity, meshChanged: Boolean, defer: Boolean = streaming) {
+    private fun applyModel(n: Node, e: Entity, meshChanged: Boolean, defer: Boolean = streaming || assembling) {
         val m = n.mat
         val twin = n.mesh != null && m != null && isTextQuad(n.mesh!!, m)
         val md = n.mesh?.let { if (twin) twinOf(it) else it }
@@ -225,9 +234,11 @@ class SpecAdapter {
          *  picks the sphere whose surface it meets first, i.e. roughly the nearest centre. */
         const val MIN_TAP_M = 0.055f
         /** Initial build uploads meshes up to this many vertices at once; bigger ones stream in. */
-        const val STREAM_MIN_VERTS = 600
+        const val STREAM_MIN_VERTS = 0                          // device: ~8 ms per mesh whatever its size
+        /** Entity creation allowed per frame while a demo assembles. */
+        const val CREATE_BUDGET_NS = 5_000_000L
         /** Streamed mesh creation allowed per frame. */
-        const val STREAM_BUDGET_NS = 6_000_000L
+        const val STREAM_BUDGET_NS = 4_000_000L
 
         private fun worldScale(n: Node): Float {
             var s = 1f; var c: Node? = n

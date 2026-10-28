@@ -45,7 +45,10 @@ var lastAboutHeightPx = 0
 
 @Composable
 fun AboutCard(previewPage: Int? = null) {
-    val d = LabHost.demo
+    // read the Compose-observed id: LabHost.demo is a plain field, so without this the card kept showing
+    // the PREVIOUS demo's text after a switch (seen in the headset: equilibrium's card in the flame lab)
+    val id = LabHost.currentId
+    val d = LabHost.demo?.takeIf { it.id == id }
     val about = d?.about
     if ((previewPage == null && !LabSettings.aboutOpen) || d == null || about == null || about.pages.isEmpty()) { Box(Modifier.size(1.dp)); return }
     var page by remember(d.id) { mutableIntStateOf(0) }

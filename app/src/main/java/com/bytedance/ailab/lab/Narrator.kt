@@ -25,14 +25,39 @@ object Narrator {
         tts = runCatching {
             TextToSpeech(context.applicationContext) { status ->
                 val t = tts ?: return@TextToSpeech
-                if (status == TextToSpeech.SUCCESS) {
-                    zhOk = t.isLanguageAvailable(Locale.SIMPLIFIED_CHINESE) >= TextToSpeech.LANG_AVAILABLE
-                    enOk = t.isLanguageAvailable(Locale.US) >= TextToSpeech.LANG_AVAILABLE
-                    android.util.Log.i("Narrator", "tts ready: zh=$zhOk en=$enOk")
-                    ready = true
-                }
+                if (status == TextToSpeech.SUCCESS) probe(t, context.applicationContext.cacheDir)
             }
         }.getOrNull()
+    }
+
+    /**
+     * The Swan's engine (Qualcomm) answers isLanguageAvailable(zh) = yes but then logs "no language model found"
+     * and stays silent. So each language is proven by synthesising a short phrase to a file: only a non-empty
+     * file counts, and the read-aloud button shows only for a language that really speaks.
+     */
+    private fun probe(t: TextToSpeech, dir: java.io.File) {
+        val tests = listOf(Locale.SIMPLIFIED_CHINESE to "你好", Locale.US to "Hello")
+        val files = tests.map { java.io.File(dir, "tts_probe_${it.first.language}.wav").also { f -> f.delete() } }
+        var left = tests.size
+        t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            override fun onStart(id: String) {}
+            override fun onDone(id: String) { if (id.startsWith("probe")) finish(id, true) else speaking = false }
+            @Deprecated("API") override fun onError(id: String) { if (id.startsWith("probe")) finish(id, false) else speaking = false }
+            override fun onError(id: String, code: Int) { if (id.startsWith("probe")) finish(id, false) else speaking = false }
+            private fun finish(id: String, done: Boolean) {
+                val k = id.removePrefix("probe").toInt()
+                val ok = done && files[k].length() > 1000
+                if (k == 0) zhOk = ok else enOk = ok
+                android.util.Log.i("Narrator", "tts probe ${tests[k].first}: ${if (ok) "speaks" else "SILENT"} (${files[k].length()} B)")
+                if (--left == 0) ready = true
+            }
+        })
+        tests.forEachIndexed { k, (loc, text) ->
+            val lang = t.isLanguageAvailable(loc) >= TextToSpeech.LANG_AVAILABLE
+            if (!lang) { if (k == 0) zhOk = false else enOk = false; if (--left == 0) ready = true; return@forEachIndexed }
+            t.language = loc
+            t.synthesizeToFile(text, null, files[k], "probe$k")
+        }
     }
 
     /** A voice exists for the current display language. */

@@ -67,7 +67,10 @@ fun toModel(d: MeshData): MeshModel {
     for (k in 0 until n) {
         pos += Vector3(d.pos[k * 3], d.pos[k * 3 + 1], d.pos[k * 3 + 2])
         nrm += Vector3(d.nrm[k * 3], d.nrm[k * 3 + 1], d.nrm[k * 3 + 2])
-        uv += Vector2(d.uv[k * 2], d.uv[k * 2 + 1])
+        // the device samples textures with v = 0 at the BOTTOM row (GL convention); our images and SoftRender put
+        // row 0 / v = 0 at the TOP — without this flip every texture showed upside down in the headset
+        // (flame lab: "eV" read "ǝΛ", "600" read "900")
+        uv += Vector2(d.uv[k * 2], 1f - d.uv[k * 2 + 1])
     }
     return MeshModel(pos, d.idx.toList(), nrm, null, uv)
 }
