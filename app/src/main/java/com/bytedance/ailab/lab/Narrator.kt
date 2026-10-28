@@ -36,7 +36,7 @@ object Narrator {
      * file counts, and the read-aloud button shows only for a language that really speaks.
      */
     private fun probe(t: TextToSpeech, dir: java.io.File) {
-        val tests = listOf(Locale.SIMPLIFIED_CHINESE to "你好", Locale.US to "Hello")
+        val tests = listOf(Locale.SIMPLIFIED_CHINESE to "你好", Locale.US to "Hello")   // i18n-ok (speech probe, not UI)
         val files = tests.map { java.io.File(dir, "tts_probe_${it.first.language}.wav").also { f -> f.delete() } }
         var left = tests.size
         t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
