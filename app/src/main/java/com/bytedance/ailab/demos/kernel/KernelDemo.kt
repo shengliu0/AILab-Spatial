@@ -36,6 +36,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -251,12 +252,23 @@ object KernelDemo : SpecDemo() {
         // ---- the lift animation (down first when a different lift is pending)
         val target = if (pendingLift != null) 0f else if (goalLifted) 1f else 0f
         val rate = 1f / RISE_S[speedIdx]
+        val lift0 = liftT; val fade0 = planeFade; val drop0 = dropT
         liftT = if (liftT < target) minOf(target, liftT + dt * rate) else maxOf(target, liftT - dt * rate * 2f)
+        // the points start rising into 3-D (the lift): a rising whoosh; lowering back gets a deeper one
+        if (lift0 == 0f && liftT > 0f) Sfx.play(Sfx.WHOOSH, gain = 0.35f, pitch = 1.15f)
+        if (lift0 == 1f && liftT < 1f) Sfx.play(Sfx.WHOOSH, gain = 0.25f, pitch = 0.8f)
         if (liftT == 0f && pendingLift != null) { lab.configure(lift = pendingLift!!); pendingLift = null; dropT = 0f }
         if (showLifted) {
             planeFade = minOf(1f, planeFade + dt / 0.6f)
             if (planeFade >= 1f) dropT = minOf(1f, dropT + dt / (1.3f * RISE_S[speedIdx] / 2.2f))
         } else { planeFade = 0f; dropT = 0f }
+        if (showLifted && fade0 < 1f && planeFade >= 1f) {
+            // the SVM's plane found in 3-D: a chime if it separates every point, else only a glassy ping
+            if (lab.accuracy(true) >= 0.999) Sfx.play(Sfx.CHIME, gain = 0.6f, pan = BC.x / 0.9f)
+            else Sfx.play(Sfx.GLASS, gain = 0.4f, pan = BC.x / 0.9f)
+        }
+        // the cut curve has dropped onto the floor (the curved 2-D boundary lands): a soft pop
+        if (showLifted && drop0 < 1f && dropT >= 1f) Sfx.play(Sfx.POP, gain = 0.3f, pitch = 0.9f)
         // ---- nudge animation
         if (nudgeIdx >= 0) {
             nudgeT = minOf(1f, nudgeT + dt / 0.45f)
@@ -508,8 +520,10 @@ object KernelDemo : SpecDemo() {
         val dPlane = KernelLab.planeDelta(snapW, snapB, m.w, m.b)
         val moved = hypot(lab.pts.x[i] - snapX, lab.pts.y[i] - snapY)
         if (moved >= 0.05) {
-            if (!snapSv && dPlane < 1e-5) { farOk = true; lastMove = 1; lastMoveT = 4f }
-            else if (snapSv && dPlane > 1e-3) { svOk = true; lastMove = 2; lastMoveT = 4f }
+            // a far point moved, plane unchanged: just a quiet tick (nothing happened to the boundary)
+            if (!snapSv && dPlane < 1e-5) { farOk = true; lastMove = 1; lastMoveT = 4f; Sfx.play(Sfx.TICK, gain = 0.25f) }
+            // a support vector moved and the plane had to be found again: a pop
+            else if (snapSv && dPlane > 1e-3) { svOk = true; lastMove = 2; lastMoveT = 4f; Sfx.play(Sfx.POP, gain = 0.45f) }
             else lastMoveT = 0f
         }
     }

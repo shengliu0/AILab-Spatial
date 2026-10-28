@@ -34,6 +34,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -141,6 +142,7 @@ object BackpropDemo : SpecDemo() {
     private var sheetDirty = true
     private var time = 0f
     private var introDone = false
+    private var perfectChimed = false      // the 100 %-accuracy chime has played for this run
     private var beat = 0f
     private val oldW = Array(3) { DoubleArray(64) }
     private var view: Net.Trace? = null   // what the nodes show (step trace while animating, else a probe)
@@ -281,7 +283,7 @@ object BackpropDemo : SpecDemo() {
         cur = trainer.worstSample(); selCol = -1; selIdx = 0
         animT = -1f; applied = false; lastStepShown = false; stepAcc = 0f
         sheetTimer = 0f; evalTimer = 0f; probeTimer = 0f; sheetDirty = true; time = 0f; introDone = false; beat = 0f
-        stepsDone = 0; neuronPicks = 0; view = null
+        stepsDone = 0; neuronPicks = 0; view = null; perfectChimed = false
         wShownR.fill(-1f); wShownM.fill(-1); gShown.fill(-1f); gShownR.fill(-1f); gShownM.fill(-1)
         labels.clear(); readoutText = ""
     }
@@ -337,7 +339,7 @@ object BackpropDemo : SpecDemo() {
 
     private fun resetNet(seed: Long) {
         trainer.reset(DataKind.values()[kindIdx], if (wide) Trainer.WIDE else Trainer.NARROW, seed)
-        trainer.lr = Trainer.LRS[lrIdx]
+        trainer.lr = Trainer.LRS[lrIdx]; perfectChimed = false
         cur = trainer.worstSample(); selCol = -1; lastStepShown = false
         layoutNetwork(); sheetDirty = true; refreshSheet(); refreshView()
     }
@@ -358,6 +360,8 @@ object BackpropDemo : SpecDemo() {
         view = trainer.trace
         animT = 0f; applied = false; lastStepShown = true
         gShown.fill(-1f)
+        // the forward pulse sets off (inputs -> output): a bright whoosh
+        Sfx.play(Sfx.WHOOSH, gain = 0.25f, pitch = 1.25f, pan = -0.3f)
     }
 
     private fun finishAnim() {
@@ -383,10 +387,13 @@ object BackpropDemo : SpecDemo() {
         if (!introDone && time >= 0.3f) { introDone = true; stepSample(cur) }
 
         if (training) {
+            val ep0 = trainer.epoch
             stepAcc += Trainer.STEPS_PER_S[speedIdx] * dt
             val n = min(stepAcc.toInt(), 120)
             stepAcc -= n
             if (n > 0) { trainer.trainSteps(n); sheetDirty = true }
+            // one more pass over the data (an epoch): a quiet tick — a soft buzz at the fastest speed
+            if (trainer.epoch != ep0) Sfx.play(Sfx.TICK, gain = if (speedIdx >= 2) 0.07f else 0.14f, pitch = 1.1f)
             evalTimer += dt
             if (evalTimer >= 0.1f) { evalTimer = 0f; trainer.evaluate() }
         }
@@ -394,10 +401,24 @@ object BackpropDemo : SpecDemo() {
         if (sheetDirty && (sheetTimer >= 0.2f || !training)) refreshSheet()
 
         if (animT >= 0f) {
+            val a0 = animT
             animT += dt / ANIM_S[speedIdx]
-            if (animT >= 0.85f && !applied) applyNow()
+            // the error appears (p vs target): a tick at the bead
+            if (a0 < 0.40f && animT >= 0.40f) Sfx.play(Sfx.TICK, gain = 0.3f, pitch = 0.8f, pan = PC.x / 0.9f)
+            // the backward pulse sets off (output -> inputs): a low, reversed-feeling whoosh
+            if (a0 < 0.5f && animT >= 0.5f) Sfx.play(Sfx.WHOOSH, gain = 0.25f, pitch = 0.75f, pan = 0.3f)
+            if (animT >= 0.85f && !applied) {
+                applyNow()
+                // the weights update and the surface bends: a soft pop
+                Sfx.play(Sfx.POP, gain = 0.3f, pan = PC.x / 0.9f)
+            }
             if (animT >= 1f) animT = -1f
         }
+        // 100 % accuracy reached (latched: re-arms only once accuracy falls well below, e.g. after a reset)
+        if (trainer.accuracy >= 1.0 && !perfectChimed && trainer.steps > 0) {
+            perfectChimed = true
+            Sfx.play(Sfx.CHIME, gain = 0.6f, pan = PC.x / 0.9f)
+        } else if (trainer.accuracy < 0.9) perfectChimed = false
         probeTimer += dt
         if (animT < 0f && (probeTimer >= 0.1f || view == null)) { probeTimer = 0f; refreshView() }
 

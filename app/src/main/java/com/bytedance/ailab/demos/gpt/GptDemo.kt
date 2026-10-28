@@ -33,6 +33,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -383,15 +384,25 @@ object GptDemo : SpecDemo() {
         phase = Phase.FLY; phaseT = 0f; grow = 0f
         flyer.setMesh(glyphMesh(model.charOf(tok))); flyer.visible = true
         layoutDirty = true; threadsDirty = true; slotsDirty = true
+        // a token sampled from the fan (one draw from the distribution): a quiet tick where it leaves
+        Sfx.play(Sfx.TICK, gain = 0.15f, pan = (flyFrom.x / 0.9f).coerceIn(-1f, 1f))
     }
 
     private fun land() {
+        val p = probs.getOrElse(flyTok) { 0.5 }.toFloat()          // the probability the model gave this token
         seq += flyTok; picks++; autoCount++
         if (flyShift && hl >= 0) hl -= 1
         flyer.visible = false
         recompute()
         phase = Phase.GROW; phaseT = 0f; grow = 0f
-        if (autoGen && sentenceDone()) autoGen = false
+        // the generated token lands in the sequence: a pop, higher when the model was sure of it
+        val pan = (slotX(seq.size.coerceAtMost(W) - 1, 0f) / 0.9f).coerceIn(-1f, 1f)
+        Sfx.play(Sfx.POP, gain = 0.35f, pitch = 0.8f + 0.5f * p.coerceIn(0f, 1f), pan = pan)
+        if (autoGen && sentenceDone()) {
+            autoGen = false
+            // the generated sentence is complete (auto-generation stops by itself): a soft chime
+            Sfx.play(Sfx.CHIME, gain = 0.4f, pan = pan)
+        }
     }
 
     /** Append characters immediately (review states). */

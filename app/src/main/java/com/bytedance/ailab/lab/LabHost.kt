@@ -261,7 +261,7 @@ object LabHost {
         loading = true
         try {
             hideLabels(); toastLeft = 0f; toastEntity?.enabled = false
-            Narrator.stop()
+            Narrator.stop(); Sfx.clearQueue()
             val prev = current; val prevRoot = currentRoot
             if (prev != null && prevRoot != null) { prevRoot.enabled = false; warm.remove(prev.id); warm[prev.id] = prev to prevRoot }
             current = null; currentRoot = null
@@ -294,6 +294,7 @@ object LabHost {
         val d = current ?: return
         if (loading) return
         tickToast(dt)
+        Sfx.tick(System.nanoTime() / 1_000_000)
         stressTick()
         LessonRunner.tick(dt)
         billboardProbe(dt)

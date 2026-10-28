@@ -34,6 +34,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -95,6 +96,9 @@ object MlpDemo : SpecDemo() {
     private val H2_F = Frame(P3(0.250f, 0.170f, -0.21f))
     private val OUT_F = Frame(P3(0.640f, 0.170f, 0.00f))
     private val CARD_F = Frame(P3(-0.120f, -0.118f, 0.03f))
+    /** waveT at which the forward wave reaches hidden-1 / hidden-2 / output (starts of the ease windows in update). */
+    private val WAVE_ARRIVE = floatArrayOf(0.22f, 0.52f, 0.80f)
+    private val LAYER_X = floatArrayOf(H1_F.c.x, H2_F.c.x, OUT_F.c.x)
     private const val CARD_S = 0.158f
     private const val PLINTH_Y = -0.262f
 
@@ -744,8 +748,21 @@ object MlpDemo : SpecDemo() {
         if (penDown || ghost != null) dimK = max(0.35f, dimK - dt * 3f)
 
         if (waveT < 1f) {
+            val w0 = waveT
             waveT = (waveT + dt / waveDur).coerceAtMost(1f)
-            if (waveT >= 1f && hasResult) wavesDone++
+            if (hasResult) {
+                // the prediction wave arriving at each layer (64 -> 32 -> 10): a quiet tick, rising in pitch,
+                // panned to where that layer stands
+                for (l in 0 until 3) if (w0 < WAVE_ARRIVE[l] && waveT >= WAVE_ARRIVE[l])
+                    Sfx.play(Sfx.TICK, gain = 0.22f, pitch = 0.9f + 0.18f * l, pan = LAYER_X[l] / 0.9f)
+            }
+            if (waveT >= 1f && hasResult) {
+                wavesDone++
+                // a digit recognised: a confident answer chimes, an unsure one only pops (pitch by confidence)
+                val c = act.confidence
+                if (c >= 0.8f) Sfx.play(Sfx.CHIME, gain = 0.45f, pan = OUT_F.c.x / 0.9f)
+                else Sfx.play(Sfx.POP, gain = 0.4f, pitch = 0.8f + 0.4f * c, pan = OUT_F.c.x / 0.9f)
+            }
         }
         val e = floatArrayOf(ease(win(0.22f, 0.40f)), ease(win(0.52f, 0.66f)), ease(win(0.80f, 1.0f)))
         for (l in 0 until 3) {

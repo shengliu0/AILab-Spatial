@@ -36,6 +36,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -102,6 +103,7 @@ object CnnDemo : SpecDemo() {
     private var shownEn: Boolean? = null
     private var prevI = 0; private var prevJ = 0
     private var lastRevealK = -1
+    private var soundK = 0                // scanK last time a scan sound was considered
 
     private val SPEEDS = floatArrayOf(4f, 24f, 160f)       // kernel positions per second
     private val N_POS = 26 * 26
@@ -461,6 +463,14 @@ object CnnDemo : SpecDemo() {
             }
         }
         val ci = scanK / 26; val cj = scanK % 26
+        if (scanK != soundK) {
+            val pan = (cj / 25f - 0.5f) * 0.6f
+            if (playing && !manual && scanK >= N_POS - 1 && soundK < N_POS - 1)
+                Sfx.play(Sfx.POP, gain = 0.4f, pan = pan)                          // the whole feature map is done
+            else if (speedIdx < 2 || manual) Sfx.play(Sfx.TICK, gain = if (speedIdx == 0 || manual) 0.18f else 0.08f, pan = pan)  // one kernel position
+            else if (ci != soundK / 26) Sfx.play(Sfx.TICK, gain = 0.12f, pitch = 0.9f)  // fastest speed: one tick per row
+            soundK = scanK
+        }
         // glide between positions at the slow speed (purely visual; the computation is per integer position)
         val f = if (playing && !manual && speedIdx == 0) ProcTex.smooth01(scanAcc / 0.55f) else 1f
         val gi = prevI + (ci - prevI) * f; val gj = prevJ + (cj - prevJ) * f

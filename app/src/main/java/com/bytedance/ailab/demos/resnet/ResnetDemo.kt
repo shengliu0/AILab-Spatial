@@ -35,6 +35,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -362,8 +363,21 @@ object ResnetDemo : SpecDemo() {
     override fun update(dt: Float) {
         if (layoutDepth != depth) applyLayout()
         if (playing) {
+            val e0 = floor(epochF).toInt()
             epochF += dt * EPS[speedIdx]
-            if (epochF >= EPOCHS) { epochF = EPOCHS.toFloat(); playing = false; replayEnds++ }
+            // one more replayed training epoch: a quiet tick
+            if (floor(epochF).toInt() != e0 && epochF < EPOCHS) Sfx.play(Sfx.TICK, gain = 0.12f)
+            if (epochF >= EPOCHS) {
+                epochF = EPOCHS.toFloat(); playing = false; replayEnds++
+                // replay finished: the right tower (residual, or plain when skips are off) trained well (chime)
+                // or degraded to near chance (low thud)
+                val acc = runOf(1).acc[EPOCHS]
+                when {
+                    acc >= 0.9f -> Sfx.play(Sfx.CHIME, gain = 0.55f, pan = TX[1] / 0.9f)
+                    acc < 0.7f -> Sfx.play(Sfx.THUD, gain = 0.6f, pitch = 0.8f, pan = TX[1] / 0.9f)
+                    else -> Sfx.play(Sfx.POP, gain = 0.4f, pan = TX[1] / 0.9f)
+                }
+            }
         }
         if (epochF >= EPOCHS - 1e-3f) plainSeen += depth
         pulse = (pulse + dt / 1.8f) % 1f

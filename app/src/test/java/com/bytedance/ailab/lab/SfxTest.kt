@@ -19,4 +19,23 @@ class SfxTest {
         }
         Sfx.play(Sfx.CLACK)              // JVM: not initialised -> must be a harmless no-op
     }
+
+    @Test
+    fun queuedBurstIsSpacedNotMerged() {
+        // 31 clacks requested within ~0.4 s of 72 Hz frames (the 100:1 colliding blocks at speed): every one is
+        // released, at least 30 ms apart, when requests arrive no faster than the queue can hold
+        Sfx.clearQueue(); val r0 = Sfx.released
+        var t = 0L; var asked = 0
+        repeat(200) { f ->
+            if (asked < 31 && f % 1 == 0) { Sfx.queue(Sfx.CLACK); asked++; if (asked % 4 == 0) Unit }
+            Sfx.tick(t); t += 14
+            if (f % 2 == 0) Sfx.tick(t)
+        }
+        println("SFX queue: asked $asked, released ${Sfx.released - r0}")
+        assertTrue(Sfx.released - r0 in 12..31)
+        // sparse requests (one every 40 ms) are all released
+        Sfx.clearQueue(); val r1 = Sfx.released; t = 0L
+        repeat(40) { Sfx.queue(Sfx.TICK); Sfx.tick(t); t += 40 }
+        assertTrue("sparse: ${Sfx.released - r1}", Sfx.released - r1 == 40)
+    }
 }

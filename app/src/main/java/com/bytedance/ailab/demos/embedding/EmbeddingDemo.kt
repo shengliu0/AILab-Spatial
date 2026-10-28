@@ -30,6 +30,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -296,7 +297,22 @@ object EmbeddingDemo : SpecDemo() {
 
         var moving = false
         if (morph < 1f) { morph = min(1f, morph + dt / 0.9f); moving = true; dirty = true }
-        if (grow < 1f) { grow = min(1f, grow + dt / 1.3f); dirty = true }
+        if (grow < 1f) {
+            val g0 = grow
+            grow = min(1f, grow + dt / 1.3f); dirty = true
+            // the arrow A − B is carried onto C (analogy sets off): a soft whoosh
+            if (g0 == 0f && sel.size == 3) Sfx.play(Sfx.WHOOSH, gain = 0.25f, pan = (world(posOf(sel[2])).x / 0.9f).coerceIn(-1f, 1f))
+            if (grow >= 1f && sel.size >= 2) {
+                if (sel.size == 3) {
+                    // the analogy lands: A − B + C reaches its 4th corner — a chime at the landing point
+                    val t = posOf(sel[0]) - posOf(sel[1]) + posOf(sel[2])
+                    Sfx.play(Sfx.CHIME, gain = 0.5f, pan = (world(t).x / 0.9f).coerceIn(-1f, 1f))
+                } else {
+                    // the difference vector A − B is drawn: a soft pop at A
+                    Sfx.play(Sfx.POP, gain = 0.3f, pan = (world(posOf(sel[0])).x / 0.9f).coerceIn(-1f, 1f))
+                }
+            }
+        }
         if (moving || cur.isEmpty()) applyPositions()
         if (dirty) { dirty = false; applySelection() }
         updateLabels()

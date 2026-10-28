@@ -80,6 +80,40 @@ object Sfx {
         p.play(id, g * minOf(1f, 1f - pn), g * minOf(1f, 1f + pn), 1, 0, pitch.coerceIn(0.5f, 2f))
     }
 
+    // ---------------------------------------------------------------- queued bursts
+    /**
+     * Events that must each be HEARD even when several happen within one frame (the colliding blocks: 31 clacks
+     * in ~1 s at 100:1). [play] would merge them; [queue] spaces them [QUEUE_GAP_MS] apart instead, released by
+     * [tick] each frame. A backlog beyond [QUEUE_MAX] drops the oldest — at 10⁴:1 the ear hears a buzz anyway.
+     */
+    const val QUEUE_GAP_MS = 30L
+    const val QUEUE_MAX = 12
+    private class Q(val name: String, val gain: Float, val pitch: Float, val pan: Float)
+    private val queued = ArrayDeque<Q>()
+    private var lastQueued = 0L
+    /** Released by [tick] so far (tests). */
+    var released = 0; private set
+
+    fun queue(name: String, gain: Float = 1f, pitch: Float = 1f, pan: Float = 0f) {
+        if (!enabled) return
+        queued.addLast(Q(name, gain, pitch, pan))
+        while (queued.size > QUEUE_MAX) queued.removeFirst()
+    }
+
+    /** Called every frame (LabHost.tick) with the frame clock in ms. */
+    fun tick(nowMs: Long) {
+        if (nowMs < lastQueued) lastQueued = nowMs - QUEUE_GAP_MS          // clock restarted (tests)
+        if (queued.isEmpty() || nowMs - lastQueued < QUEUE_GAP_MS) return
+        val q = queued.removeFirst(); lastQueued = nowMs; released++
+        val p = pool ?: return
+        val id = ids[q.name] ?: return
+        val pn = q.pan.coerceIn(-1f, 1f); val g = q.gain.coerceIn(0f, 1f)
+        p.play(id, g * minOf(1f, 1f - pn), g * minOf(1f, 1f + pn), 1, 0, q.pitch.coerceIn(0.5f, 2f))
+    }
+
+    /** Forget queued sounds (demo switch). */
+    fun clearQueue() { queued.clear(); lastQueued = Long.MIN_VALUE / 2 }
+
     // ---------------------------------------------------------------- synthesis (mono float -1..1)
     private fun buf(seconds: Float) = FloatArray((seconds * RATE).toInt())
     private val rnd = java.util.Random(7)

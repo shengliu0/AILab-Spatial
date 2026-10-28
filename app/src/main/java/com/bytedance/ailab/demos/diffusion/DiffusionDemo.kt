@@ -42,6 +42,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -401,7 +402,14 @@ object DiffusionDemo : SpecDemo() {
         genCount++
         mode = Mode.GENERATING; tShow = T.toFloat(); tTarget = -1f; paused = false
         dotBand.fill(-1); pathsDirty = true; arrowT = -1
+        stepsHeard = 0
+        // fresh Gaussian noise drawn at t = T (generation starts): a fizz at the noise slice
+        Sfx.play(Sfx.FIZZ, gain = 0.3f, pan = P1.x / 0.9f)
     }
+
+    /** Denoising steps already shown (sampler grid points tau_1..tau_S that the displayed time has passed). */
+    private var stepsHeard = 0
+    private fun stepsShown(r: ReverseRun): Int { var n = 0; for (k in 1 until r.tau.size) if (r.tau[k] >= tShow) n++; return n }
 
     fun setSteps(s: Int) { stepsIdx = STEP_OPTIONS.indexOf(s).coerceAtLeast(0) }
     /** Loading the dataset already shown in forward mode changes nothing (selectDataset ignores it). */
@@ -426,11 +434,27 @@ object DiffusionDemo : SpecDemo() {
                 val front = r.tau[r.stepsDone].toFloat()     // lowest t whose positions are known
                 if (!paused && !dragging) tShow = maxOf(front, tShow - rate * dt)
                 tShow = maxOf(tShow, front)
+                // one more denoising step shown (the cloud moves to the next grid time): a quiet tick, softer
+                // when there are many steps (200 steps in 4.5 s is a gentle buzz), panned along the time axis
+                val sh = stepsShown(r)
+                if (sh > stepsHeard) {
+                    Sfx.play(Sfx.TICK, gain = if (r.steps >= 50) 0.08f else 0.2f, pitch = 0.9f + 0.3f * (1f - tShow / T),
+                        pan = (along(tShow).x / 0.9f).coerceIn(-1f, 1f))
+                    stepsHeard = sh
+                }
                 if (r.finished && tShow <= 0f) {
                     mode = Mode.DONE; tShow = 0f
                     val q = qualityOf(r.result())
                     lastDone = GenResult(r.dataset, r.steps, r.ddim, q.q)
                     pathsDirty = true
+                    // the shape has formed at t = 0: chime for a good sample, a pop for a fair one, a low thud
+                    // for a smeared one (same thresholds as the green / yellow / red quality gauge)
+                    val pan = P0.x / 0.9f
+                    when {
+                        q.q >= 0.8f -> Sfx.play(Sfx.CHIME, gain = 0.55f, pan = pan)
+                        q.q >= 0.5f -> Sfx.play(Sfx.POP, gain = 0.4f, pan = pan)
+                        else -> Sfx.play(Sfx.THUD, gain = 0.5f, pitch = 0.85f, pan = pan)
+                    }
                 }
             }
             Mode.DONE -> if (tTarget >= 0f && !dragging) tShow = approach(tShow, tTarget, rate * dt).also { if (it == tTarget) tTarget = -1f }

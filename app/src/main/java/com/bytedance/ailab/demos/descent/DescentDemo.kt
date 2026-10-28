@@ -34,6 +34,7 @@ import com.bytedance.ailab.lab.Lesson
 import com.bytedance.ailab.lab.LessonStep
 import com.bytedance.ailab.lab.Q
 import com.bytedance.ailab.lab.SpecDemo
+import com.bytedance.ailab.lab.Sfx
 import com.bytedance.ailab.lab.TapTarget
 import com.bytedance.ailab.lab.spec.Blend
 import com.bytedance.ailab.lab.spec.LabelSpec
@@ -288,8 +289,20 @@ object DescentDemo : SpecDemo() {
     }
 
     private fun stepOnce() {
+        val hit0 = BooleanArray(3) { race.racers[it].firstHit >= 0 }
+        val div0 = BooleanArray(3) { race.racers[it].diverged }
         race.step()
         for (k in 0 until 3) if (race.active[k]) hop[k] = 0f
+        // one optimiser step (all racers in lockstep): a quiet tick, softer at the fast speed
+        Sfx.play(Sfx.TICK, gain = if (speedIdx >= 2) 0.10f else 0.16f)
+        for (k in 0 until 3) {
+            if (!race.active[k] || k >= balls.size) continue
+            val r = race.racers[k]; val pan = (balls[k].pos.x / 0.9f).coerceIn(-1f, 1f)
+            // this ball has just reached the minimum: a chime, pitched per optimiser (SGD low … Adam high)
+            if (!hit0[k] && r.firstHit >= 0) Sfx.play(Sfx.CHIME, gain = 0.5f, pitch = 0.9f + 0.12f * k, pan = pan)
+            // this ball has just diverged (flew off the surface): a low thud
+            if (!div0[k] && r.diverged) Sfx.play(Sfx.THUD, gain = 0.6f, pitch = 0.8f, pan = pan)
+        }
     }
 
     private fun trailCode(k: Int) = if (!race.active[k]) -2 else race.racers[k].steps * 4 + (if (race.racers[k].diverged) 1 else 0) + shownSurf * 100_000
