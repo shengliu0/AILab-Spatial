@@ -24,7 +24,15 @@ class DemoContext(val cacheDir: File)
  * same code path as pinching the object — so the panel and the object can never disagree. [isOn]
  * (optional) lights the button up while that object's state is "on" (lamp burning, slit covered).
  */
-data class TapTarget(val node: String, val zh: String, val en: String, val isOn: (() -> Boolean)? = null)
+data class TapTarget(
+    val node: String, val zh: String, val en: String,
+    /** False = this action does nothing in the current state: the button is greyed out and a pinch only says why. */
+    val enabled: (() -> Boolean)? = null,
+    /** Why it is unavailable right now (shown on pinch), e.g. Bi("先熄灭灯", "Turn the lamp off first"). */
+    val why: Bi? = null,
+    /** Trailing lambda: lights the button while the object is "on". */
+    val isOn: (() -> Boolean)? = null,
+)
 
 interface Demo {
     /** Stable id (used by the debug broadcast and the bake cache), e.g. "young". */
@@ -302,6 +310,19 @@ object LabHost {
     fun onTap(name: String?, fromPanel: Boolean = false) {
         val d = current ?: return
         if (name == null) return
+        val tt = d.tapTargets.firstOrNull { it.node == name }
+        if (tt?.enabled?.invoke() == false) {                 // by design unavailable now: say why, do nothing
+            uiEpoch++
+            val at = d.anchorOf(name)
+            toastText = "⚠ " + (tt.why?.text ?: tr("现在不可用", "Not available right now"))
+            Log.i("LabTap", "${d.id} tap $name via ${if (fromPanel) "panel" else "pinch"} -> disabled")
+            if (at != null) toastEntity?.let { e ->
+                val k = LabSettings.scale
+                e.components[TransformComponent::class.java]?.position = Vector3(at[0] * k, at[1] * k, at[2] * k); e.enabled = !catalogOpen
+                toastLeft = TOAST_S
+            }
+            return
+        }
         d.onTap(name)
         uiEpoch++
         d.flash(name)

@@ -88,7 +88,9 @@ fun LabPanel(readout: String, controls: @Composable FlowRowScope.() -> Unit) {
                 style = PicoTheme.typography.bodyLarge.copy(fontSize = 22.sp), maxLines = 1)
             targets.forEach { t ->
                 val on = t.isOn?.invoke() == true
-                SegmentItem(selected = on, onClick = { LabHost.onTap(t.node, fromPanel = true) }, title = { Text((if (on) "✓ " else "") + tr(t.zh, t.en)) })
+                val ok = t.enabled?.invoke() != false
+                Chip(selected = on && ok, onClick = { LabHost.onTap(t.node, fromPanel = true) }, enabled = ok,
+                    content = { Text((if (on && ok) "✓ " else "") + tr(t.zh, t.en)) })
             }
         }
     }
@@ -124,6 +126,6 @@ fun LabSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float
 
 /** On/off as one big toggle chip (✓ when on): the SpatialUI Switch is a small target for gaze. */
 @Composable
-fun LabSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Chip(selected = checked, onClick = { onChange(!checked) }, content = { Text(if (checked) "✓ $label" else label) })
+fun LabSwitch(label: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Chip(selected = checked && enabled, onClick = { if (enabled) onChange(!checked) }, enabled = enabled, content = { Text(if (checked) "✓ $label" else label) })
 }

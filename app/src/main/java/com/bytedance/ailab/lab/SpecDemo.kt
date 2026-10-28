@@ -137,11 +137,16 @@ abstract class SpecDemo : Demo {
 
     override suspend fun build(ctx: DemoContext): Entity {
         halos.clear(); haloBase.clear(); flashNode = null; haloClock = 0f; haloScan = 1f; haloAlphaShown = -1f
+        val t0 = System.nanoTime()
         val r = withContext(Dispatchers.Default) { buildSpec(ctx.cacheDir) }
+        val t1 = System.nanoTime()
         root = r
         val a = SpecAdapter(); adapter = a
         update(0f)
-        return a.build(r)
+        val e = a.build(r)
+        android.util.Log.i("LabHost", "BUILD $id: spec %.0f ms (background), first frame %.0f ms: ${a.takeStats()}, %d streaming".format(
+            (t1 - t0) / 1e6, (System.nanoTime() - t1) / 1e6, a.pendingCount))
+        return e
     }
 
     override fun tick(dt: Float) {

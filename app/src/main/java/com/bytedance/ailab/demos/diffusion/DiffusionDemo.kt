@@ -190,6 +190,9 @@ object DiffusionDemo : SpecDemo() {
     }
     private val noiseDot by lazy { Mat.Unlit(dim(NOISE_C, 0.85f), tex = glowTex, blend = Blend.ADD) }
     private val tracerMats by lazy { Array(3) { Mat.Unlit(TRACER_C[it], tex = glowTex, blend = Blend.ADD) } }
+    /** Un-followed tracers glow dimmer, so following/unfollowing is visible on the dot even at t = 0 (no path yet). */
+    private val tracerDimMats by lazy { Array(3) { Mat.Unlit(dim(TRACER_C[it], 0.4f), tex = glowTex, blend = Blend.ADD) } }
+    private val tracerLit = IntArray(3) { -1 }
     private val ARROW_C = arrayOf(Rgb(0.55f, 0.48f, 0.20f), Rgb(0.78f, 0.68f, 0.28f), Rgb(1.00f, 0.86f, 0.40f), Rgb(1.00f, 0.96f, 0.70f))
     private val arrowMats by lazy { Array(4) { Mat.Unlit(ARROW_C[it], blend = Blend.ADD) } }
     private val pathMats by lazy { Array(3) { Mat.Unlit(dim(TRACER_C[it], 0.9f), blend = Blend.ADD) } }
@@ -280,7 +283,7 @@ object DiffusionDemo : SpecDemo() {
         quality = Quality.Score(1f, 1f); qualityT = 0f; arrowT = -1; arrowClock = 0f; arrowDataset = -1
         hueGridFor = -1; pathsDirty = true; lastMsg = null
         placedT = -1f; placedRun = null; placedMode = null; placedStamp = -1
-        dotBand.fill(-1); arrowBand.fill(-1)
+        dotBand.fill(-1); arrowBand.fill(-1); tracerLit.fill(-1)
 
         val root = Node("DiffusionRoot")
 
@@ -401,6 +404,8 @@ object DiffusionDemo : SpecDemo() {
     }
 
     fun setSteps(s: Int) { stepsIdx = STEP_OPTIONS.indexOf(s).coerceAtLeast(0) }
+    /** Loading the dataset already shown in forward mode changes nothing (selectDataset ignores it). */
+    private fun canLoad(d: Int) = d != datasetIdx || mode != Mode.FORWARD
     fun selectDataset(d: Int) { if (d != datasetIdx || mode != Mode.FORWARD) applyDataset(d) }
     fun resetToData() { applyDataset(datasetIdx) }
 
@@ -568,6 +573,8 @@ object DiffusionDemo : SpecDemo() {
         if (!pathsDirty) return
         pathsDirty = false
         for (j in 0 until 3) {
+            val lit = if (follow[j]) 1 else 0
+            if (lit != tracerLit[j]) { tracerLit[j] = lit; dots[j].setMat(if (follow[j]) tracerMats[j] else tracerDimMats[j]) }
             val segs = paths[j]
             if (!follow[j]) { for (s in segs) s.visible = false; continue }
             // vertices (t, x, y) from the start of the process to now
@@ -666,9 +673,12 @@ object DiffusionDemo : SpecDemo() {
         TapTarget("DotA", "粒子 A → 跟随", "Dot A → follow") { follow[0] },
         TapTarget("DotB", "粒子 B → 跟随", "Dot B → follow") { follow[1] },
         TapTarget("DotC", "粒子 C → 跟随", "Dot C → follow") { follow[2] },
-        TapTarget("Tile0", "螺旋 → 载入", "Spiral → load") { datasetIdx == 0 },
-        TapTarget("Tile1", "双月 → 载入", "Moons → load") { datasetIdx == 1 },
-        TapTarget("Tile2", "光 字 → 载入", "Glyph → load") { datasetIdx == 2 },
+        TapTarget("Tile0", "螺旋 → 载入", "Spiral → load", enabled = { canLoad(0) },
+            why = Bi("螺旋已经载入（要从头看，用面板的「重置」）", "Spiral is already loaded (panel Reset starts over)")) { datasetIdx == 0 },
+        TapTarget("Tile1", "双月 → 载入", "Moons → load", enabled = { canLoad(1) },
+            why = Bi("双月已经载入（要从头看，用面板的「重置」）", "Moons are already loaded (panel Reset starts over)")) { datasetIdx == 1 },
+        TapTarget("Tile2", "光 字 → 载入", "Glyph → load", enabled = { canLoad(2) },
+            why = Bi("「光」字已经载入（要从头看，用面板的「重置」）", "Glyph is already loaded (panel Reset starts over)")) { datasetIdx == 2 },
     )
 
     override fun isTarget(name: String) = name == "NoiseSlice" || name == "TimeHandle" || name in TRACER_NAMES || name in TILE_NAMES
@@ -843,7 +853,7 @@ object DiffusionDemo : SpecDemo() {
                 Spacer(Modifier.width(20.dp))
                 LabSwitch(tr("分数场箭头", "Score arrows"), ar) { ar = it }
                 LabSwitch(tr("时间切片", "Time slices"), sl) { sl = it }
-                Button(onClick = { resetToData() }) { Text(tr("重置", "Reset")) }
+                Button(onClick = { resetToData() }, enabled = mode != Mode.FORWARD || tShow != 0f || tTarget >= 0f) { Text(tr("重置", "Reset")) }
             }
         }
     }

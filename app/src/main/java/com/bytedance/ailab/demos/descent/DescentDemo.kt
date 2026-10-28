@@ -631,7 +631,7 @@ object DescentDemo : SpecDemo() {
             Button(onClick = { togglePlay() }) {
                 Text(if (race.allDone) tr("↻ 再跑一次", "↻ Run again") else if (playing) tr("⏸ 暂停", "⏸ Pause") else tr("▶ 继续", "▶ Run"))
             }
-            Button(onClick = { stepOnceManual() }) { Text(tr("单步", "Step")) }
+            Button(onClick = { stepOnceManual() }, enabled = !race.allDone) { Text(tr("单步", "Step")) }
             Button(onClick = { restartRun() }) { Text(tr("↺ 重来", "↺ Restart")) }
             Spacer(Modifier.width(6.dp))
             SegmentControl {

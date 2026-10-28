@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -115,12 +116,12 @@ fun RowScope.SegmentItem(
 /** A big button (drop-in for the SpatialUI Button's `Button(onClick) { content }` form). */
 @Composable
 fun Button(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable () -> Unit) {
-    Chip(selected = false, onClick = { if (enabled) onClick() }, modifier = modifier, content = content, outlined = true)
+    Chip(selected = false, onClick = { if (enabled) onClick() }, modifier = modifier, content = content, outlined = true, enabled = enabled)
 }
 
 @Composable
 internal fun Chip(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier,
-                  content: @Composable () -> Unit, outlined: Boolean = false) {
+                  content: @Composable () -> Unit, outlined: Boolean = false, enabled: Boolean = true) {
     val shape = RoundedCornerShape((GAZE_TARGET_DP / 2).dp)
     Box(
         modifier = modifier
@@ -131,6 +132,8 @@ internal fun Chip(selected: Boolean, onClick: () -> Unit, modifier: Modifier = M
             .heightIn(min = GAZE_TARGET_DP.dp)
             .defaultMinSize(minWidth = 112.dp)
             .gazeFeedback(shape = shape)
+            // unavailable: faded (still clickable, so a pinch can say WHY instead of silently doing nothing)
+            .alpha(if (enabled) 1f else 0.38f)
             .background(if (selected) CHIP_ON else CHIP, shape)
             .then(if (outlined && !selected) Modifier.border(2.dp, Color(0x55FFFFFF), shape) else Modifier)
             .padding(horizontal = 26.dp, vertical = 10.dp),

@@ -677,7 +677,7 @@ object ResnetDemo : SpecDemo() {
             LabRow {
                 Button(onClick = { play(!playing) }) { Text(if (playing) tr("⏸ 暂停", "⏸ Pause") else tr("▶ 回放训练", "▶ Replay")) }
                 Button(onClick = { restart() }) { Text(tr("⏮ 从头", "⏮ From 0")) }
-                Button(onClick = { toEnd() }) { Text(tr("⏭ 结束", "⏭ End")) }
+                Button(onClick = { toEnd() }, enabled = playing || epochF < EPOCHS) { Text(tr("⏭ 结束", "⏭ End")) }
                 Text(tr("深度", "Depth"), color = PicoTheme.colorScheme.labelSecondary, style = st)
                 SegmentControl { DEPTHS.forEachIndexed { k, d -> SegmentItem(selected = di == k, onClick = { chooseDepth(k); di = k }, title = { Text("$d") }) } }
             }

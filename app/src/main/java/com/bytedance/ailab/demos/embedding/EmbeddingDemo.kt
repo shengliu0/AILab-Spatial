@@ -100,6 +100,7 @@ object EmbeddingDemo : SpecDemo() {
     var spinIdx = 0
     private var yaw = -0.35f
     private var yawTravel = 0f
+    private var yawShown = Float.NaN
     /** Selected words, in pinch order: A, B, C. */
     private val sel = ArrayList<Int>()
     private var grow = 1f                         // analogy / arrow animation 0..1
@@ -204,7 +205,7 @@ object EmbeddingDemo : SpecDemo() {
 
     override fun buildSpec(cacheDir: File): Node {
         // reset EVERYTHING (rebuild idempotence)
-        preset = 0; fromView = 0; morph = 1f; showAll = false; spinIdx = 0; yaw = -0.35f; yawTravel = 0f
+        preset = 0; fromView = 0; morph = 1f; showAll = false; spinIdx = 0; yaw = -0.35f; yawTravel = 0f; yawShown = Float.NaN
         sel.clear(); grow = 1f; dirty = true; enShown = -1; lastMsg = Bi("", ""); neighbours = emptyList(); cands = emptyList()
         spinDragging = false; cur.clear(); tileUp.clear(); dots.clear(); tiles.clear(); stepYaw = 0f; fromSnapshot = null; travelAtStep = 0f
 
@@ -289,7 +290,9 @@ object EmbeddingDemo : SpecDemo() {
         val step = if (abs(stepYaw) > 1e-4f) stepYaw * min(1f, dt * 6f) else stepYaw.also { stepYaw = 0f }
         stepYaw -= step
         yaw += spin + step; yawTravel += abs(spin + step)
-        cloud.rot = Q.axisAngle(0f, 1f, 0f, yaw)
+        // only touch the transform when the yaw moved: a still cloud costs no transform upload, and a knob turn
+        // (or drag) is a real change the renderer — and DeadTapTest — can see
+        if (yaw != yawShown) { yawShown = yaw; cloud.rot = Q.axisAngle(0f, 1f, 0f, yaw) }
 
         var moving = false
         if (morph < 1f) { morph = min(1f, morph + dt / 0.9f); moving = true; dirty = true }
@@ -548,7 +551,7 @@ object EmbeddingDemo : SpecDemo() {
             }
             LabRow {
                 Button(onClick = { exampleAnalogy() }) { Text(tr("示例类比", "Example")) }
-                Button(onClick = { clearSelection() }) { Text(tr("清除", "Clear")) }
+                Button(onClick = { clearSelection() }, enabled = sel.isNotEmpty()) { Text(tr("清除", "Clear")) }
                 Button(onClick = { resetAll() }) { Text(tr("重置", "Reset")) }
             }
         }

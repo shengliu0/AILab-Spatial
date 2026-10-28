@@ -55,13 +55,25 @@ class SpecAdapter {
             val e = ent[n] ?: continue
             applyModel(n, e, meshChanged = true, defer = false)
         }
-        if (pending.isEmpty()) Log.i("SpecAdapter", "streamed meshes complete")
+        if (pending.isEmpty()) Log.i("SpecAdapter", "streamed in: ${takeStats()}")
     }
 
     /** Create entities for new nodes and push every changed property. Main thread. */
+    // per-frame sync statistics: transform / visibility writes cross into native code (device log every 4 s)
+    private var syTf = 0; private var syVis = 0; private var syFrames = 0; private var syWorstNs = 0L; private var syWorstTf = 0
+    private var syTfTotal = 0L; private var syT0 = 0L
+
     fun sync(root: Node) {
+        val sy0 = System.nanoTime(); syTf = 0; syVis = 0
         fun rec(n: Node, parent: Entity?) {
             var e = ent[n]
+            // a hidden subtree that already exists: nothing it does is visible, so skip its transform/mesh writes
+            // (pooled particles keep moving while hidden); everything changed is written when it shows again
+            if (e != null && !n.visible) {
+                val s0 = seen[n]!!
+                if (s0.vis != n.visVersion) { e.enabled = false; s0.vis = n.visVersion; syVis++ }
+                return
+            }
             if (e == null) {
                 e = Entity().apply { setName(safeName(n.name)) }
                 ent[n] = e; seen[n] = Seen()
@@ -77,13 +89,13 @@ class SpecAdapter {
                 t.position = com.pico.spatial.core.math.Vector3(n.pos.x, n.pos.y, n.pos.z)
                 t.quaternion = com.pico.spatial.core.math.Quat(n.rot.x, n.rot.y, n.rot.z, n.rot.w)
                 t.scaleVector = com.pico.spatial.core.math.Vector3(n.scale.x, n.scale.y, n.scale.z)
-                s.tf = n.tfVersion
+                s.tf = n.tfVersion; syTf++
             }
             if (s.mesh != n.meshVersion || s.mat != n.matVersion) {
                 applyModel(n, e, meshChanged = s.mesh != n.meshVersion)
                 s.mesh = n.meshVersion; s.mat = n.matVersion
             }
-            if (s.vis != n.visVersion) { e.enabled = n.visible; s.vis = n.visVersion }
+            if (s.vis != n.visVersion) { e.enabled = n.visible; s.vis = n.visVersion; syVis++ }
             if (s.tap != n.tapVersion) {
                 if (n.tapRadius > 0f) makeTappable(e, maxOf(n.tapRadius, MIN_TAP_M / worldScale(n)))
                 if (n.billboard && !e.components.has(com.pico.spatial.core.ecs.LookAtComponent::class.java))
@@ -96,9 +108,19 @@ class SpecAdapter {
             for (c in n.children) rec(c, e)
         }
         rec(root, null)
+        val buildPass = streaming
         streaming = false
-        flushPending()
+        if (!buildPass) flushPending()                         // the build frame itself only creates what is cheap
         flushMeshes()
+        val dt = System.nanoTime() - sy0
+        syFrames++; syTfTotal += syTf
+        if (dt > syWorstNs) { syWorstNs = dt; syWorstTf = syTf }
+        if (syT0 == 0L) syT0 = sy0
+        if (sy0 - syT0 > 4_000_000_000L) {
+            Log.i("SpecSync", "%d frames: %.0f transform writes/frame avg, worst sync %.1f ms (%d transform + %d visibility writes that frame)".format(
+                syFrames, syTfTotal.toDouble() / syFrames, syWorstNs / 1e6, syWorstTf, syVis))
+            syFrames = 0; syTfTotal = 0; syWorstNs = 0; syT0 = sy0
+        }
     }
 
     /**
@@ -131,10 +153,15 @@ class SpecAdapter {
         val twin = n.mesh != null && m != null && isTextQuad(n.mesh!!, m)
         val md = n.mesh?.let { if (twin) twinOf(it) else it }
         if (md == null || m == null) { e.components.remove(ModelComponent::class.java); mats.remove(n); pending.remove(n); return }
-        if (defer && md.vertexCount > STREAM_MIN_VERTS && !meshCache.containsKey(md)) { if (n !in pending) pending += n; return }
+        // stream: big meshes and not-yet-created textures (each TextureResource is a synchronous GPU upload)
+        val newTex = when (m) { is Mat.Unlit -> m.tex; is Mat.Pbr -> m.tex }?.let { !texCache.containsKey(it) } ?: false
+        if (defer && ((md.vertexCount > STREAM_MIN_VERTS && !meshCache.containsKey(md)) || newTex)) { if (n !in pending) pending += n; return }
         if (!defer) pending.remove(n)
-        val mr = meshCache.getOrPut(md) {
-            com.pico.spatial.core.ecs.resource.MeshResource.createWithMeshModel(toModel(md), boundsFor(md), "m${meshSeq++}")
+        val mr = meshCache[md] ?: run {
+            val t0 = System.nanoTime()
+            com.pico.spatial.core.ecs.resource.MeshResource.createWithMeshModel(toModel(md), boundsFor(md), "m${meshSeq++}").also {
+                meshCache[md] = it; statMeshN++; statMeshNs += System.nanoTime() - t0
+            }
         }
         val kind = kindOf(m) + if (twin) "T" else ""
         val existing = mats[n]
@@ -251,7 +278,14 @@ class SpecAdapter {
 
     /** Cached texture for [img]. Textures are made GLOBAL in [tex]: a local one is closed by the SDK when its
      *  material switches texture, and reusing the cached handle crashed setBaseColorTexture. */
-    private fun texOf(img: Image?) = img?.let { texCache.getOrPut(it) { tex(it) } }
+    private fun texOf(img: Image?) = img?.let { texCache.getOrPut(it) { val t0 = System.nanoTime(); tex(it).also { statTexN++; statTexNs += System.nanoTime() - t0 } } }
+
+    // build-cost statistics (device log: where does a demo's load time go?)
+    private var statMeshN = 0; private var statMeshNs = 0L; private var statTexN = 0; private var statTexNs = 0L
+    fun takeStats(): String {
+        val s = "meshes %d (%.0f ms), textures %d (%.0f ms)".format(statMeshN, statMeshNs / 1e6, statTexN, statTexNs / 1e6)
+        statMeshN = 0; statMeshNs = 0; statTexN = 0; statTexNs = 0; return s
+    }
 
     private fun create(m: Mat): Material = when (m) {
         is Mat.Unlit -> unlit(

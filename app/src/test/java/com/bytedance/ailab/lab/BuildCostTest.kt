@@ -23,13 +23,19 @@ class BuildCostTest {
             val specMs = (System.nanoTime() - t0) / 1e6
             var nodes = 0
             val meshes = IdentityHashMap<MeshData, Boolean>()
-            fun rec(n: Node) { nodes++; n.mesh?.let { meshes[it] = true }; n.children.forEach(::rec) }
+            val images = IdentityHashMap<com.bytedance.ailab.render.Image, Boolean>()
+            fun rec(n: Node) {
+                nodes++; n.mesh?.let { meshes[it] = true }
+                when (val m = n.mat) { is com.bytedance.ailab.lab.spec.Mat.Unlit -> m.tex?.let { images[it] = true }; is com.bytedance.ailab.lab.spec.Mat.Pbr -> m.tex?.let { images[it] = true }; else -> {} }
+                n.children.forEach(::rec)
+            }
             rec(root)
             val verts = meshes.keys.sumOf { it.vertexCount.toLong() }
             val estMs = verts * 0.017 + nodes * 0.05
             total += estMs
-            println("BUILD %-16s spec %6.0f ms (JVM)  nodes %5d  meshes %4d  verts %7d  -> device upload est %6.0f ms"
-                .format(d.id, specMs, nodes, meshes.size, verts, estMs))
+            val px = images.keys.sumOf { it.w.toLong() * it.h }
+            println("BUILD %-16s spec %6.0f ms (JVM)  nodes %5d  meshes %4d  verts %7d  textures %3d (%5.1f Mpx)  -> mesh upload est %6.0f ms"
+                .format(d.id, specMs, nodes, meshes.size, verts, images.size, px / 1e6, estMs))
         }
         println("BUILD total est %.0f ms".format(total))
     }

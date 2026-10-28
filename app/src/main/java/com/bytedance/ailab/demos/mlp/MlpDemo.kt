@@ -1101,7 +1101,7 @@ object MlpDemo : SpecDemo() {
                 SegmentControl {
                     SPEED_LABELS.forEachIndexed { k, l -> SegmentItem(selected = si == k, onClick = { si = k }, title = { Text(l) }) }
                 }
-                Button(onClick = { replayWave() }) { Text(tr("重放光波", "Replay wave")) }
+                Button(onClick = { replayWave() }, enabled = hasResult) { Text(tr("重放光波", "Replay wave")) }
             }
         }
     }
