@@ -104,7 +104,7 @@ object LessonRunner {
         val s = l.steps.getOrNull(i)
         when {
             s == null -> { phase = if (l.challenge != null) Phase.CHALLENGE else Phase.FINISHED; challengeText = runCatching { l.challenge?.progress?.invoke() }.getOrNull() ?: "" }
-            insight && s.insight != null -> { phase = Phase.INSIGHT; insightText = (if (s.reveal) verdict() + "\n" else "") + s.insight.text }
+            insight && s.insight != null -> { phase = Phase.INSIGHT; insightText = (if (s.reveal) verdict().let { if (it.isEmpty()) "" else it + "\n" } else "") + s.insight.text }
             else -> phase = Phase.STEP
         }
         epoch++
@@ -157,7 +157,7 @@ object LessonRunner {
     private fun complete(s: LessonStep) {
         val ins = s.insight
         if (ins == null) { advance(); return }
-        insightText = (if (s.reveal) verdict() + "\n" else "") + ins.text
+        insightText = (if (s.reveal) verdict().let { if (it.isEmpty()) "" else it + "\n" } else "") + ins.text
         phase = Phase.INSIGHT; timer = 0f; epoch++
     }
 
