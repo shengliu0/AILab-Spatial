@@ -34,6 +34,7 @@ import com.bytedance.ailab.core.diffusion.ForwardChain
 import com.bytedance.ailab.core.diffusion.Quality
 import com.bytedance.ailab.core.diffusion.ReverseRun
 import com.bytedance.ailab.core.diffusion.Rng
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.LabAssets
@@ -723,6 +724,34 @@ object DiffusionDemo : SpecDemo() {
     // ---------------------------------------------------------------- guided track (导学)
 
     private var genAtEnter = 0
+
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("一条由 8 片玻璃组成的「时间面包」：最前面 t = 0 是数据（一团螺旋形的点），越往后噪声越多，最远处 t = T 只剩一团乱点。拖动时间滑块，看数据一步步融化成噪声；捏最远的噪声切片，模型从纯噪声出发，把 300 个点一步步推回螺旋。可以跟随粒子 A、B、C，换双月或字形，在面板上选步数和 DDPM / DDIM。", "A “time loaf” of 8 glass slices: at the front, t = 0, is the data (points forming a spiral); further back there is more noise, until at t = T only a random cloud is left. Drag the time handle to watch the data melt into noise; pinch the far noise slice and the model starts from pure noise and pushes 300 points back into the spiral, step by step. Follow dots A, B, C, try two moons or a glyph, and pick steps and DDPM / DDIM on the panel."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("「生成模型」不是回答问题，而是造出新东西：新的图片、声音，这里是一团新的点。「噪声」就是随机的抖动，像老电视上的雪花。「分布」描述数据大致长什么样：哪里点多、哪里点少。这里的模型没有记住任何一个点，它学的是这团点的「形状」，所以每次都能生成一批不同的新点。", "A “generative model” doesn't answer questions; it makes new things — new pictures, sounds, here a new cloud of points. “Noise” is random jitter, like snow on an old TV. A “distribution” describes what the data roughly looks like: where points are dense and where sparse. This model memorised no single point; it learned the shape of the cloud, so every run produces a different new batch."),
+        ),
+        About.Page(
+            Bi("背景：从墨水扩散到画图", "Background: from spreading ink to pictures"),
+            Bi("2015 年，索尔-迪克斯坦等人从物理里的「扩散」得到灵感：墨水滴进水里会慢慢散开，模型能不能学会把它倒着收回来？2020 年，Ho、Jain 和 Abbeel 提出 DDPM，第一次用这个思路画出高质量的图片；同年又有了更快的 DDIM。2022 年，DALL·E 2、Stable Diffusion 等模型让人人都能「用一句话画图」。", "In 2015 Sohl-Dickstein and colleagues took inspiration from diffusion in physics: ink dropped in water slowly spreads out — could a model learn to run that backwards? In 2020 Ho, Jain and Abbeel's DDPM used the idea to make high-quality pictures for the first time; the faster DDIM followed the same year. In 2022 DALL·E 2 and Stable Diffusion let anyone “draw with a sentence”."),
+        ),
+        About.Page(
+            Bi("核心想法：学会撤销噪声", "Key idea: learn to undo noise"),
+            Bi("对着一幅沙画轻轻吹一口气，图案就模糊一点；吹 200 口，只剩一盘均匀的沙。破坏很容易，模型要学的是反过来：看一盘有点乱的沙，猜出刚才吹进去的「噪声」，把它减掉一点。从纯噪声出发，把这一小步重复几十上百次，一个新的图案就浮现出来。每一步往哪推，就是场景里的箭头。", "Blow gently on a sand drawing and it blurs a little; blow 200 times and only an even layer of sand is left. Destroying is easy; the model learns the reverse: look at slightly messy sand, guess the “noise” just blown in, and remove a bit of it. Start from pure noise, repeat that small step tens or hundreds of times, and a new pattern emerges. Which way to push at each step is what the arrows in the scene show."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("斜着排开的长轴 = 时间 t；每片玻璃 = t 时刻所有点的样子，越往后越乱。明亮的活动切片 = 当前时刻，上面有 300 个粒子；箭头 = 网络在这个噪声水平学到的推力（「分数场」）：噪声大时指向中间，噪声小时指向形状。穿过切片的细线 = 被跟随的粒子穿越时间的路径。「质量」读数衡量生成的点和原数据有多像。", "The long slanted axis = time t; each glass slice = the cloud at time t, messier towards the back. The bright live slice = the current moment, carrying 300 particles; arrows = the push the network learned at this noise level (the “score field”): towards the middle when noise is high, towards the shape when it is low. Threads through the slices = the paths of followed particles. The quality reading scores how close the generated points are to the data."),
+        ),
+        About.Page(
+            Bi("有多大？今天在哪里？", "How big? Where is it today?"),
+            Bi("这里每个样本只是平面上的一个点（2 个数），去噪网络约 2.6 万个参数，在电脑生成的点云上训练。一张 1024×1024 的彩色图却有 300 多万个数，真实的图像模型有数亿到数十亿参数，还要听懂文字提示。原理相同：从噪声出发一步步去噪。今天的 AI 画图、AI 视频、修图里的「扩展画面」，大多建立在扩散模型上。", "Here each sample is just a point in a plane (2 numbers), and the denoiser has about 26,000 parameters, trained on generated point clouds. A 1024×1024 colour image has over 3 million numbers, and real image models have hundreds of millions to billions of parameters — and must understand a text prompt. The principle is the same: start from noise and denoise step by step. Most AI image and video generators build on diffusion."),
+        ),
+    ))
 
     override val lesson: Lesson by lazy {
         Lesson(

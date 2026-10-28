@@ -109,7 +109,7 @@
              -->
             <meta-data
                 android:name="pico.spatial.windowcontainer.volumebasepanel"
-                android:value="0" />
+                android:value="1" />
 
         </activity>
         <meta-data android:name="icon.3d.list" android:resource="@array/icon_3d_list" />

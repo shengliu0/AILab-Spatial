@@ -83,6 +83,17 @@ class UiPreviewTest {
                 if (l.challenge != null) { LessonRunner.previewAt(l.steps.size, false)
                     capture(act, File(out, "${tag}_lesson_${d.id}_challenge.png")) { com.bytedance.ailab.content.LessonCard() }; n++ }
             }
+            // the background card (📖): every page, both languages, must fit without scrolling
+            for (d in DemoRegistry.all) {
+                if (only.isNotEmpty() && d.id != only) continue
+                val ab = d.about ?: continue
+                LabHost.previewAs(d)
+                for (i in ab.pages.indices) {
+                    capture(act, File(out, "${tag}_about_${d.id}_p${i + 1}.png")) { com.bytedance.ailab.content.AboutCard(previewPage = i) }; n++
+                    val h = com.bytedance.ailab.content.lastAboutHeightPx
+                    if (h > com.bytedance.ailab.content.ABOUT_MAX_H_DP) tall += "$tag/${d.id} about p${i + 1} ${h} dp"
+                }
+            }
             if (only.isEmpty()) {
                 capture(act, File(out, "${tag}_topbar.png")) { LabTopBar { } }; n++
                 LabHost.showCatalog(true)

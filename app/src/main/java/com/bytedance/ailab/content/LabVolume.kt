@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -20,8 +19,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bytedance.ailab.lab.DemoContext
-import com.bytedance.ailab.lab.LabAssets
 import com.bytedance.ailab.lab.LabHost
+import com.bytedance.ailab.lab.LabAssets
+import com.bytedance.ailab.lab.LabSettings
+import com.bytedance.ailab.lab.Narrator
+import androidx.compose.runtime.remember
 import com.bytedance.ailab.lab.LabTickSystem
 import com.bytedance.ailab.lab.group
 import com.bytedance.ailab.lab.tr
@@ -48,6 +50,23 @@ import kotlinx.coroutines.launch
 private val MENU_POS = Vector3(0f, 0.52f, 0.95f)
 private val CATALOG_POS = Vector3(0f, 0.02f, 0.98f)
 private val PANEL_POS = Vector3(0f, -0.36f, 0.92f)
+/**
+ * Where the control panel can sit (LabSettings.panelPos): front-bottom (wide), or on the left / right,
+ * narrow and turned 30 deg toward the viewer so it reads straight on from the default eye point.
+ */
+private fun panelPose(i: Int): Pair<Vector3, com.pico.spatial.core.math.Quat> {
+    val yaw = when (i) { com.bytedance.ailab.lab.LabSettings.PANEL_LEFT -> 30f; com.bytedance.ailab.lab.LabSettings.PANEL_RIGHT -> -30f; else -> 0f }
+    val h = Math.toRadians(yaw / 2.0)
+    val q = com.pico.spatial.core.math.Quat(0f, kotlin.math.sin(h).toFloat(), 0f, kotlin.math.cos(h).toFloat())
+    val p = when (i) {
+        com.bytedance.ailab.lab.LabSettings.PANEL_LEFT -> Vector3(-0.78f, -0.12f, 0.62f)
+        com.bytedance.ailab.lab.LabSettings.PANEL_RIGHT -> Vector3(0.78f, -0.12f, 0.62f)
+        else -> PANEL_POS
+    }
+    return p to q
+}
+/** Background card: upper right (upper left when the panel is on the right). */
+private fun aboutPos(panel: Int) = if (panel == com.bytedance.ailab.lab.LabSettings.PANEL_RIGHT) Vector3(-0.66f, 0.26f, 0.95f) else Vector3(0.66f, 0.26f, 0.95f)
 /** Guided-track card: upper left, beside the top bar (x -0.90 … -0.48 for its 520 dp). */
 private val LESSON_POS = Vector3(-0.69f, 0.43f, 0.95f)
 /** A pinch released within this long is a tap (the OS verdict's timeout is unknown and was too strict). */
@@ -57,8 +76,6 @@ private const val TAP_MAX_MS = 1500L
 fun LabVolume(firstDemo: String) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // demos read shipped files (trained weights) through LabAssets: here, from the APK
-    remember(context) { LabAssets.open = { path -> runCatching { context.assets.open(path).use { it.readBytes() } }.getOrNull() }; 0 }
 
     DisposableEffect(Unit) {
         registerSystem<LabTickSystem>()
@@ -72,6 +89,18 @@ fun LabVolume(firstDemo: String) {
             if (id != null) { LabHost.switchTo(id); LabHost.requested = null }
         }
     }
+    // layout choices (top bar): scene scale, panel pose, background card position — applied live
+    LaunchedEffect(Unit) { snapshotFlow { LabSettings.scaleIdx }.collect { LabHost.applyScale() } }
+    LaunchedEffect(Unit) {
+        snapshotFlow { LabSettings.panelPos }.collect { i ->
+            val (p, q) = panelPose(i)
+            LabHost.controlsEntity?.components?.get(TransformComponent::class.java)?.apply { position = p; quaternion = q }
+            LabHost.aboutEntity?.components?.get(TransformComponent::class.java)?.position = aboutPos(i)
+        }
+    }
+    remember(context) { Narrator.init(context); 0 }
+    // demos read shipped files (trained weights) through LabAssets: here, from the APK
+    remember(context) { LabAssets.open = { path -> runCatching { context.assets.open(path).use { it.readBytes() } }.getOrNull() }; 0 }
 
     val density = LocalDensity.current
     val lengths = LocalPhysicalLengthConverter.current
@@ -135,9 +164,15 @@ fun LabVolume(firstDemo: String) {
                 content.addEntity(this)
             }
             attachments.entity(id = "controls")?.apply {
-                components[TransformComponent::class.java]?.position = PANEL_POS
+                val (p, q) = panelPose(LabSettings.panelPos)
+                components[TransformComponent::class.java]?.apply { position = p; quaternion = q }
                 content.addEntity(this)
                 LabHost.controlsEntity = this
+            }
+            attachments.entity(id = "about")?.apply {
+                components[TransformComponent::class.java]?.position = aboutPos(LabSettings.panelPos)
+                content.addEntity(this)
+                LabHost.aboutEntity = this
             }
             attachments.entity(id = "lesson")?.apply {
                 components[TransformComponent::class.java]?.position = LESSON_POS
@@ -167,6 +202,7 @@ fun LabVolume(firstDemo: String) {
             for (i in 0 until LabHost.LABEL_SLOTS) AttachmentPanel(id = "label$i") { LabelChip(LabHost.labelText[i]) }
             AttachmentPanel(id = "toast") { ToastChip(LabHost.toastText) }
             AttachmentPanel(id = "lesson") { LessonCard() }
+            AttachmentPanel(id = "about") { AboutCard() }
         },
     )
 }

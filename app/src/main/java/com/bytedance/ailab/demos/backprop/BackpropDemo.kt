@@ -27,6 +27,7 @@ import com.bytedance.ailab.core.backprop.DataKind
 import com.bytedance.ailab.core.backprop.Datasets
 import com.bytedance.ailab.core.backprop.Net
 import com.bytedance.ailab.core.backprop.Trainer
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.Lesson
@@ -687,6 +688,34 @@ object BackpropDemo : SpecDemo() {
     private var baseSteps = 0
     private var basePicks = 0
     private var baseTrain = 0L
+
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("左边讲台上的斜面是「输入平面」，上面的珠子是两类训练数据。空中悬着一个小网络：2 个输入 → 两层隐藏神经元 → 1 个输出。捏金圈里的点，网络就学一步：白光前向，品红的「误差」往回流，然后每根连线改一点。按「训练」，这一步重复成千上万次。右前方的数据架可换 XOR、圆环、螺旋。", "On the left lectern, the tilted “input plane” holds the training data as beads of two classes. In the air floats a small network: 2 inputs → two hidden layers → 1 output. Pinch the point in the gold ring and the network learns one step: white light forward, magenta “blame” flowing back, then every connection changes a little. Press Train to repeat it thousands of times. The shelf (front right) swaps XOR, circles and spirals."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("网络（模型）对每个点给出一个概率 p：它有多大把握这是第 1 类。正确答案叫「标签」y（0 或 1）；p 离 y 有多远，用「损失」打分。每根连线上的数叫「权重」，是要学的参数。「梯度」∂L/∂w 回答：这根权重稍微变大一点，损失会变大还是变小、变多少？知道了它，就知道往哪边改。", "The network (the model) gives each point a probability p: how sure it is that the point is class 1. The right answer is the “label” y (0 or 1); the “loss” scores how far p is from y. The number on each connection is a “weight”, a parameter to be learned. The “gradient” ∂L/∂w answers: if this weight grew a little, would the loss go up or down, and by how much? Knowing it tells you which way to turn."),
+        ),
+        About.Page(
+            Bi("背景：1986 年的突破", "Background: the 1986 breakthrough"),
+            Bi("多层网络早有人提出，却几十年训练不好：中间层的权重出了错，该怪谁、怪多少？1986 年，鲁梅尔哈特、辛顿和威廉姆斯在《自然》上展示：用微积分的「链式法则」把误差从输出一层层往回分摊，一次就能算出所有权重的梯度。这个方法此前也有人独立想到，但正是这篇论文让神经网络第一次真正学会了东西。", "Multi-layer networks had been proposed long before, but for decades nobody could train them well: when a middle-layer weight is wrong, whose fault is it, and how much? In 1986 Rumelhart, Hinton and Williams showed in Nature that the calculus “chain rule” shares the error back from the output, layer by layer, giving every weight's gradient in one pass. Others had found it earlier, but this paper made networks really learn."),
+        ),
+        About.Page(
+            Bi("核心想法：往回追责", "Key idea: tracing the blame"),
+            Bi("想象流水线做坏了一件产品，质检员从最后一道工序往回问：你这一步让结果偏了多少？每个工人的「责任」= 他自己的放大倍数 × 下游传回来的责任之和。每根连线该改多少 = 起点有多活跃 × 终点担多少责。一次反向就把全部算完，代价和前向差不多。", "Picture an assembly line that made a faulty product. The inspector walks back from the last station asking: how much did your step push the result off? Each worker's “blame” = their own amplification × the blame passed back from downstream. How much a connection should change = how active its start is × how much blame its end carries. One backward pass computes it all, at about the cost of the forward pass."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("输入平面上的曲面 = 网络在每一处给出的 p（高度和颜色），白线是 p = 0.5 的分界，珠子 = 训练点。空中的球 = 神经元（蓝正红负），连线 = 权重（越粗 |w| 越大，颜色 = 正负）。品红套筒越粗，这根权重的梯度越大；品红圆环 = 神经元的责任 δ；白色虚影 = 更新前的旧权重。", "The surface over the input plane = the network's p at every spot (height and colour); the white line is the p = 0.5 boundary; beads = training points. Spheres in the air = neurons (blue +, red −); threads = weights (thicker = larger |w|, colour = sign). A thicker magenta sleeve = a bigger gradient for that weight; magenta rings = a neuron's blame δ; white ghosts = the weights before the update."),
+        ),
+        About.Page(
+            Bi("有多大？今天在哪里？", "How big? Where is it today?"),
+            Bi("这里的网络最多只有 105 个参数（2→8→8→1），在你眼前实时训练。GPT-3 有 1750 亿个参数，但训练它用的仍是同一个反向传播，只是交给显卡以惊人的速度做乘加。PyTorch 等框架会自动完成这一步（「自动求导」）—— 今天几乎每个 AI 产品的训练都靠它。", "The network here has at most 105 parameters (2→8→8→1) and trains live in front of you. GPT-3 has 175 billion parameters, yet it was trained with the same backpropagation — just with graphics chips doing multiply-adds at enormous speed. Frameworks such as PyTorch do this step automatically (“autograd”); almost every AI product today is trained with it."),
+        ),
+    ))
 
     override val lesson: Lesson by lazy {
         Lesson(

@@ -27,6 +27,7 @@ import com.bytedance.ailab.core.cnn.CnnScale
 import com.bytedance.ailab.core.cnn.Glyphs
 import com.bytedance.ailab.core.cnn.ReceptiveField
 import com.bytedance.ailab.core.cnn.SlantProbe
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.LabAssets
@@ -699,6 +700,34 @@ object CnnDemo : SpecDemo() {
     // ================================================================ guided track (导学)
     private var stepBase = 0
     private var rfBase = 0
+
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("从左到右：一张图 → 输入方块 → 第一次卷积 → 池化 → 第二次卷积 → 池化 → 右边的类别条。金色的小立方体是「卷积核」，它在输入方块上一格格滑动，每停一处就在下一层点亮一个像素。前面的架子摆着 8 个卷积核；捏最后的小方块看「感受野」。面板可切到「多光谱场景」，多一层近红外。", "Left to right: a picture → the input block → the first convolution → pooling → the second convolution → pooling → the class bars on the right. The small gold cube is a “kernel”: it slides over the input block and each stop lights one pixel in the next layer. The front shelf holds 8 kernels; pinch the last small block to see its “receptive field”. The panel switches to multispectral scenes, which add near-infrared."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("在计算机眼里，彩色图就是一摞数：红、绿、蓝三层，每层 28×28 个像素。这样一摞叫「张量」，形状写成 3×28×28。「卷积核」是一个 3×3×3 的小权重块，里面的数（参数）靠训练学出来。「特征图」是一个核扫完整张图得到的新图：哪里出现了它要找的图案，哪里就亮。", "To a computer a colour picture is a stack of numbers: red, green and blue layers of 28×28 pixels each. Such a stack is a “tensor”, of shape 3×28×28. A “kernel” is a small 3×3×3 block of weights whose numbers (parameters) are learned in training. A “feature map” is the new image you get when one kernel has swept the whole picture: it lights up wherever the pattern it looks for appears."),
+        ),
+        About.Page(
+            Bi("背景：从猫的视觉到读邮编", "Background: from cat vision to ZIP codes"),
+            Bi("1959 年起，休伯尔和威塞尔发现猫的视觉皮层里，有些细胞只对某个位置、某个方向的边缘起反应。1980 年福岛邦彦据此造出「新认知机」。1989 年杨立昆用反向传播训练卷积网络读手写邮编；2012 年，用显卡训练的大型 CNN「AlexNet」在 ImageNet 图像识别比赛中大幅领先，深度学习时代由此开始。", "From 1959 Hubel and Wiesel found cells in a cat's visual cortex that respond only to an edge at one place and angle. In 1980 Kunihiko Fukushima built the “neocognitron” on that idea. In 1989 Yann LeCun trained a convolutional network with backpropagation to read handwritten ZIP codes; in 2012 AlexNet, a large CNN trained on graphics chips, won the ImageNet contest by a wide margin and launched the deep-learning era."),
+        ),
+        About.Page(
+            Bi("核心想法：一枚小印章扫全图", "Key idea: one small stamp"),
+            Bi("卷积核像一枚小印章：按在图上某处，27 个像素各乘一个权重再相加，得到一个数；挪一格，再按。同一枚印章扫遍所有位置（权重共享），所以在左上角学会的「斜线」，在右下角也认得。一层层叠上去，后面的格子看到的范围越来越大：3 → 4 → 8 → 10 个像素见方。", "A kernel is like a little stamp: press it on one spot, multiply 27 pixels by 27 weights, add them up — one number; move one step and press again. The same stamp visits every position (weight sharing), so a “slant” learned at the top left is recognised at the bottom right too. Stack layers and later cells see ever larger patches: 3 → 4 → 8 → 10 pixels across."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("每个方块 = 一个张量：厚度 = 通道数，正面 = 图的高和宽。金色立方体 = 正在扫描的卷积核，它在深度上贯穿所有通道，所以 R、G、B 在核里就加成一个数。8 个核 → 8 张特征图，叠成下一个方块；池化把方块的长宽缩小一半。架子上的体素块 = 核的权重（暖色正、冷色负）；右边的条 = 每个类别的概率。", "Each block = a tensor: thickness = number of channels, face = height and width. The gold cube = the kernel scanning now; it spans all channels in depth, so R, G and B are summed inside it. 8 kernels → 8 feature maps, stacked into the next block; pooling halves its height and width. Voxel cubes on the shelf = kernel weights (warm +, cool −); the bars on the right = each class's probability."),
+        ),
+        About.Page(
+            Bi("有多大？今天在哪里？", "How big? Where is it today?"),
+            Bi("这里的 CNN 只有约 5400 个参数，用电脑字体合成的数字训练，在没见过的字体上约 94% 认对。真实的图像网络有数千万到上亿个参数，在上百万张照片上训练。手机拍照识物、人脸解锁、自动驾驶看路、用卫星图看庄稼长势（正是近红外那一招），背后都有卷积网络。", "The CNN here has only about 5,400 parameters, trained on digits rendered from computer fonts, and gets about 94 % right on fonts it never saw. Real image networks have tens of millions to hundreds of millions of parameters and train on millions of photos. Phone cameras that recognise objects, face unlock, self-driving cars reading the road, and crop monitoring from satellites (the near-infrared trick) all rely on convolutional networks."),
+        ),
+    ))
 
     override val lesson: Lesson by lazy {
         Lesson(

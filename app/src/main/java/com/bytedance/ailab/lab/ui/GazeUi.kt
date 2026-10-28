@@ -80,8 +80,11 @@ fun Modifier.gazeClick(maxMs: Long = 1500L, onClick: () -> Unit): Modifier = com
  * The grow is rendered by the OS and does NOT enlarge the hit area — keep it small (<= 1.05) so the
  * part that looks pinchable is pinchable; contrast comes from [dim] and the highlight.
  */
-fun Modifier.gazeFeedback(grow: Float = 1.04f, dim: Float = 1f): Modifier =
+fun Modifier.gazeFeedback(grow: Float = 1.04f, dim: Float = 1f, shape: RoundedCornerShape? = null): Modifier =
     this.spatialHoverEffect { ctx ->
+        // the OS highlight is a RECTANGLE unless the hover layer is clipped: give it the chip's own
+        // rounded shape (this clips only the hover effect — the hit area stays the full rectangle)
+        if (shape != null) clipShape(shape, ctx.size, androidx.compose.ui.unit.IntOffset.Zero)
         animation(tween(140)) { scale(if (ctx.isActive) grow else 1f) }
         if (dim < 1f) alpha(if (ctx.isActive) 1f else dim)
     }.spatialHoverEffect(SpatialHoverStyle.Highlight)
@@ -127,7 +130,7 @@ internal fun Chip(selected: Boolean, onClick: () -> Unit, modifier: Modifier = M
             .padding(vertical = HIT_SLOP_DP.dp)
             .heightIn(min = GAZE_TARGET_DP.dp)
             .defaultMinSize(minWidth = 112.dp)
-            .gazeFeedback()
+            .gazeFeedback(shape = shape)
             .background(if (selected) CHIP_ON else CHIP, shape)
             .then(if (outlined && !selected) Modifier.border(2.dp, Color(0x55FFFFFF), shape) else Modifier)
             .padding(horizontal = 26.dp, vertical = 10.dp),

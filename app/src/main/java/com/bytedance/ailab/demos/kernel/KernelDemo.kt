@@ -28,6 +28,7 @@ import com.bytedance.ailab.core.kernel.KernelGeom
 import com.bytedance.ailab.core.kernel.KernelLab
 import com.bytedance.ailab.core.kernel.Lift
 import com.bytedance.ailab.core.kernel.RbfFeature
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.Lang
@@ -594,6 +595,34 @@ object KernelDemo : SpecDemo() {
     }
 
     // ================================================================ guided track (导学)
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("地面上有两类发光的点：橙色在内圈，青色围成外环。红色竖墙是 2-D 里最好的直线，只分对约六成。捏右前方的「升维」，每个点升到高度 z = x² + y²：外圈升得更高，一块平面就能从两层之间切过。左边可换数据集，右边可换升维方式；面板调噪声和软间隔 C。", "Two classes of glowing points lie on the floor: orange inside, cyan in a ring around them. The red wall is the best straight line in 2-D — about 60 % right. Pinch “Lift” (front right) and each point rises to height z = x² + y²: the ring rises higher, so one flat plane slips between the two layers. Swap data sets on the left and lifts on the right; the panel sets noise and the soft margin C."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("「分类器」是一种模型：给它一个点，它说出属于哪一类。最简单的分类器是一条直线（在 3-D 里是一块平面）：这边一类，那边另一类。「训练」就是用已知类别的点去摆这条线。「特征」是描述一个点的数，这里每个点本来只有 x、y 两个；「升维」就是再给它算出第三个特征。", "A “classifier” is a model that takes a point and says which class it belongs to. The simplest is a straight line (in 3-D, a flat plane): one class on this side, the other on that. “Training” means placing the line using points whose classes are known. “Features” are the numbers describing a point; here each starts with just two, x and y. “Lifting” computes a third one."),
+        ),
+        About.Page(
+            Bi("背景：最宽的间隔", "Background: the widest margin"),
+            Bi("1960 年代，瓦普尼克等人提出：在所有能分开两类的直线里，选离两边最近的点都最远的那条 ——「最宽间隔」，对新数据最稳。1992 年，博泽、居永和瓦普尼克加上「核技巧」，让这把直尺能在更高维的空间里用，于是有了支持向量机（SVM）。在深度学习兴起之前，它是许多识别任务的首选。", "In the 1960s Vapnik and colleagues proposed: of all the lines that separate two classes, pick the one that stays farthest from the nearest points on both sides — the “widest margin”, the safest bet for new data. In 1992 Boser, Guyon and Vapnik added the “kernel trick”, letting this ruler work in higher dimensions: the support vector machine (SVM). Before deep learning it was the first choice for many recognition tasks."),
+        ),
+        About.Page(
+            Bi("核心想法：抬高了就直了", "Key idea: lift it and cut straight"),
+            Bi("桌上撒着黑豆和红豆，红豆围在中间，一根直尺怎么也隔不开。但把离中心越远的豆子抬得越高，一张平平的纸板就能从两层之间插进去。纸板在高处是「直」的，从上往下看，它的切口却是一个圆。核技巧更进一步：不必真算出新坐标，只要会算两个点在高维里有多「像」就够了。", "Black and red beans are scattered on a table, the red ones in the middle; no ruler can separate them. But lift each bean higher the farther it is from the centre, and a flat card slides between the two layers. Up there the card is “straight”; seen from above, its cut is a circle. The kernel trick goes further: you never compute the new coordinates — you only need how “alike” two points are up there."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("地面 = 原始的 2-D 数据；珠子的高度 = 新算出的第三个特征 z；半透明曲面 = 升维的规则（抛物面、马鞍面或 RBF 曲面）。玻璃平面 = SVM 找到的分界，两侧的薄板 = 间隔；平面切曲面的交线落回地面，就是 2-D 里弯曲的边界。带白环的珠子 = 支持向量：只有它们决定平面，挪动远处的点，平面纹丝不动。", "The floor = the raw 2-D data; a bead's height = the new third feature z; the translucent surface = the lift rule (paraboloid, saddle or RBF surface). The glass plane = the boundary the SVM found; the slab around it = the margin; the plane's cut through the surface, dropped to the floor, is the curved 2-D boundary. Beads with white rings = support vectors: only they fix the plane — move a far bead and nothing changes."),
+        ),
+        About.Page(
+            Bi("有多大？今天在哪里？", "How big? Where is it today?"),
+            Bi("这里每组只有 40 个点，SVM 在你眼前精确求解。真实常用的高斯（RBF）核相当于升到无穷多维，却只需算点与点之间的相似度。如今图像和语言多交给深度网络，但数据少的场合（如医学检测、垃圾邮件过滤）仍常用 SVM；而「先把数据变到好分的空间，再切直线」正是深度网络每一层在做的事。", "Each set here has just 40 points, and the SVM is solved exactly in front of you. The widely used Gaussian (RBF) kernel is like lifting into infinitely many dimensions, yet needs only point-to-point similarities. Deep networks now handle images and language, but SVMs still serve where data is scarce, such as medical tests and spam filters — and “transform the data until a straight cut works” is what every layer of a deep network does."),
+        ),
+    ))
+
     override val lesson: Lesson by lazy {
         Lesson(
             listOf(

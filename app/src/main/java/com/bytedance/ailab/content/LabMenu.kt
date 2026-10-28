@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.bytedance.ailab.lab.Demo
 import com.bytedance.ailab.lab.DemoRegistry
 import com.bytedance.ailab.lab.LabHost
+import com.bytedance.ailab.lab.LabSettings
 import com.bytedance.ailab.lab.Lang
 import com.bytedance.ailab.lab.tr
 import com.bytedance.ailab.lab.Subject
@@ -99,6 +100,18 @@ fun LabTopBar(onPick: (String) -> Unit) {
         // display language: one big two-state chip; the label names the language you will GET
         Button(onClick = { Lang.set(!Lang.en) }, modifier = Modifier.height(BIG).width(150.dp)) {
             Text(if (Lang.en) "中文" else "EN", style = PicoTheme.typography.bodyLarge.copy(fontSize = 28.sp, fontWeight = FontWeight.SemiBold))  // i18n-ok (language names)
+        }
+        // background card (📖), scene size, panel position — the viewer's layout choices (LabSettings)
+        if (current?.about != null) Button(onClick = { LabSettings.setAbout(!LabSettings.aboutOpen) }, modifier = Modifier.height(BIG)) {
+            Text((if (LabSettings.aboutOpen) "✓ " else "") + tr("📖 背景", "📖 About"), maxLines = 1, style = PicoTheme.typography.bodyLarge.copy(fontSize = 26.sp))
+        }
+        Button(onClick = { LabSettings.cycleScale() }, modifier = Modifier.height(BIG)) {
+            Text(tr("大小 ", "Size ") + "${(LabSettings.scale * 100).toInt()}%", maxLines = 1, style = PicoTheme.typography.bodyLarge.copy(fontSize = 26.sp))
+        }
+        Button(onClick = { LabSettings.cyclePanel() }, modifier = Modifier.height(BIG)) {
+            Text(tr("面板：", "Panel: ") + when (LabSettings.panelPos) {
+                LabSettings.PANEL_LEFT -> tr("左", "left"); LabSettings.PANEL_RIGHT -> tr("右", "right"); else -> tr("下", "bottom")
+            }, maxLines = 1, style = PicoTheme.typography.bodyLarge.copy(fontSize = 26.sp))
         }
     }
 }
@@ -160,7 +173,7 @@ private fun DemoCard(d: Demo, onClick: () -> Unit) {
             // OTHER card dims to 72% (the contrast cue). Grow is kept small: the OS draws it but the
             // hit area stays 1.0x. The click survives hand drift (gazeClick) — no Modifier.clickable.
             .gazeClick(onClick = onClick)
-            .gazeFeedback(grow = 1.05f, dim = 0.72f)
+            .gazeFeedback(grow = 1.05f, dim = 0.72f, shape = shape)
             .clip(shape)
             .background(Color(0x33000000))
             .border(if (running) 4.dp else 1.dp, if (running) ACCENT else Color(0x33FFFFFF), shape),

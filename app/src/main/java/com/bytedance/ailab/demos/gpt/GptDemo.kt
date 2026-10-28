@@ -25,6 +25,7 @@ import com.bytedance.ailab.core.P3
 import com.bytedance.ailab.core.gpt.GlyphAtlas
 import com.bytedance.ailab.core.gpt.GptModel
 import com.bytedance.ailab.core.gpt.Sampling
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.LabAssets
@@ -784,6 +785,34 @@ object GptDemo : SpecDemo() {
     /** The thank-you sentence must name the giver: who gave what to whom. */
     private val GOOD = listOf("狗谢谢猫。", "狗说：「谢谢猫！」")   // i18n-ok (model output to match)
     private fun challengeDone() = presetIdx == 1 && picks - picksAtPreset == continuation().length && GOOD.any { continuation().startsWith(it) } && phase == Phase.IDLE
+
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("这是一个真正训练过的迷你 GPT，你可以看着它「想」下一个字。最前排是句子的最后 12 个字，往后三排的发光格子依次是：嵌入、第 1 层输出、第 2 层输出。右边的扇面是下一个字的概率，中心的旋钮调「温度」；捏扇面上的字，它就接到句尾。书架上有 5 个开头，H1–H4 开关注意力头，▶ 自动写一句。", "This is a really trained mini GPT, and you can watch it “think” of the next character. The front row holds the sentence's last 12 characters; the three rows of glowing cells behind are: embedding, after layer 1, after layer 2. The fan on the right shows the next character's probabilities, with a temperature knob at its centre; pinch a character on the fan to add it. The shelf holds 5 openings; H1–H4 toggle heads; ▶ writes a sentence."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("「词元」（token）是模型读写的最小单位，这里就是一个汉字或标点，共 118 种。每个词元被换成一串数，叫「向量」（这里是 64 个数），可以想成它在 64 维空间里的位置。「语言模型」只做一件事：读前面的字，给下一个字的每种可能打一个概率。「参数」是它从文本中学到的那些数。", "A “token” is the smallest unit the model reads and writes — here a single Chinese character or punctuation mark, 118 kinds in all. Each token is turned into a list of numbers called a “vector” (64 numbers here); think of it as a position in a 64-dimensional space. A “language model” does one thing: read the text so far and give every possible next token a probability. Its “parameters” are the numbers it learned from text."),
+        ),
+        About.Page(
+            Bi("背景：注意力就够了", "Background: attention is all you need"),
+            Bi("2017 年，谷歌的瓦斯瓦尼等 8 位作者发表论文《Attention Is All You Need》，提出 Transformer：不再按顺序一个字一个字地读，而是让每个字同时去「查」其他字，因此能在显卡上大规模并行训练。2018 年 OpenAI 用它做出第一代 GPT（生成式预训练 Transformer），2022 年底的 ChatGPT 让它走进了千家万户。", "In 2017 eight Google authors led by Vaswani published “Attention Is All You Need”, introducing the Transformer: instead of reading word by word in order, every token “looks up” the others at once, so it trains in parallel on graphics chips at huge scale. In 2018 OpenAI built the first GPT (generative pre-trained Transformer) on it, and at the end of 2022 ChatGPT brought it into everyday life."),
+        ),
+        About.Page(
+            Bi("核心想法：在前文里查资料", "Key idea: look it up in the text so far"),
+            Bi("读到「明天是星期」，要猜下一个字，就得回头找「今天是星期几」。注意力就是这种查找：每个字发出一个「问题」，和前面每个字的「标签」比对，越匹配，就越多地读取那个字的内容。它只能往前查，不能偷看后面（因果遮罩）。生成就是：预测一个字、接上、再预测，一遍遍重复。", "Reading “tomorrow is day…”, to guess the next word you must look back for what day it is today. Attention is that lookup: each token sends out a “question”, compares it with every earlier token's “label”, and reads more from those that match best. It may only look back, never ahead (the causal mask). Generation is: predict one token, append it, predict again — over and over."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("字块 = 词元；上方每列 6 个格子 = 这个字的 64 维向量，压缩到最主要的 6 个方向（颜色 = 数值）。三排逐层往后 = 每过一层，向量被改写一次。排与排之间的线 = 注意力：粗细 = 读了多少，一种颜色一个头，线永远只连向左边。捏一个字块，它读了谁、谁读了它都会亮起，右边被红色遮住。扇面的每根条 = 一个候选字的概率。", "Tiles = tokens; the 6 cells above each = its 64-number vector squeezed onto the 6 main directions (colour = value). The three rows stepping back = the vectors rewritten by each layer. Threads between rows = attention: thickness = how much is read, one colour per head, always pointing left. Pinch a tile and what it reads, and what reads it, light up; the right side is veiled in red. Each bar on the fan = one candidate's probability."),
+        ),
+        About.Page(
+            Bi("和大模型比一比", "Mini GPT vs the giants"),
+            Bi("这个模型只有 2 层、4 个头、约 11 万个参数，只读过 40 万字由简单语法自动生成的句子，所以只会写「猫把书给了狗」这类话。GPT-3（2020 年）有 1750 亿个参数，是它的一百多万倍，读过数千亿词元的真实文本。原理却一样：一个字一个字地预测。今天的聊天助手、编程助手和翻译都建立在它之上。", "This model has 2 layers, 4 heads and about 110,000 parameters, and has read only 400,000 characters made by a small grammar — so it can only write sentences like “the cat gave the book to the dog”. GPT-3 (2020) has 175 billion parameters, over a million times more, and read hundreds of billions of tokens of real text. The principle is the same: predict one token at a time. Chat assistants, coding assistants and translators build on it."),
+        ),
+    ))
 
     override val lesson: Lesson by lazy {
         Lesson(

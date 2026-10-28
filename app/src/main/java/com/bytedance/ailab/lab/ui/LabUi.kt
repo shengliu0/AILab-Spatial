@@ -43,6 +43,8 @@ import com.pico.spatial.ui.platform.Material
 const val PANEL_WIDTH_DP = 1560
 /** Tallest allowed panel (dp): 0.42 m, i.e. y from -0.57 to -0.15 m around PANEL_POS. */
 const val PANEL_MAX_H_DP = 520
+/** Width when the panel sits on the left / right (LabSettings.panelPos): narrow, taller, readout may wrap. */
+const val SIDE_PANEL_WIDTH_DP = 860
 
 /** Height of the last laid-out panel in px (UiPreviewTest, mdpi: px = dp). */
 var lastPanelHeightPx = 0
@@ -62,7 +64,7 @@ fun LabPanel(readout: String, controls: @Composable FlowRowScope.() -> Unit) {
                     android.util.Log.i("LabPanel", "${LabHost.currentId} panel ${c.size.width}x${c.size.height} px")
                 }
             }
-            .width(PANEL_WIDTH_DP.dp)
+            .width((if (com.bytedance.ailab.lab.LabSettings.panelPos == com.bytedance.ailab.lab.LabSettings.PANEL_BOTTOM) PANEL_WIDTH_DP else SIDE_PANEL_WIDTH_DP).dp)
             .clip(RoundedCornerShape(40.dp))
             .backgroundMaterial(true, Material.Regular)
             .padding(horizontal = 28.dp, vertical = 20.dp),

@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import com.bytedance.ailab.core.P3
 import com.bytedance.ailab.core.embedding.WordAtlas
 import com.bytedance.ailab.core.embedding.WordSpace
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.LabAssets
@@ -574,6 +575,34 @@ object EmbeddingDemo : SpecDemo() {
         val e = ws.expected(sel[0], sel[1], sel[2])
         return e >= 0 && cands.firstOrNull()?.first == e
     }
+
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("转台上方漂浮着 96 个发光的词，颜色 = 类别（男性、女性、国家、首都、形容词、动物……）。每个词的位置都是模型学出来的。捏一个词，看和它最像的 5 个词；再捏第二个，金色箭头 = 两个词的差；捏第三个，同一支箭头搬过去，看落在哪个词旁边。台面上的旋钮转动整团云，面板可切换「性别」「首都」「比较级」视图。", "Above a turntable float 96 glowing words, coloured by category (male, female, country, capital, adjective, animal…). Their positions were learned. Pinch a word to see its 5 most similar words; pinch a second and a gold arrow shows their difference; pinch a third and the same arrow is moved there — which word does it land next to? The knob on the plinth spins the cloud; the panel switches gender, capitals and comparatives views."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("计算机不认识「国王」这两个字，它只会算数。「词向量」就是给每个词分配一串数（这里是 32 个），相当于它在 32 维空间里的坐标。两个向量方向越接近，「余弦相似度」越接近 1，说明两个词的用法越像。「训练」就是不断调整这些坐标，让模型更会预测一个词旁边常出现哪些词。", "A computer doesn't understand the word “king”; it only does arithmetic. A “word vector” gives every word a list of numbers (32 here), like coordinates in a 32-dimensional space. The closer two vectors point the same way, the closer their “cosine similarity” is to 1, meaning the words are used alike. “Training” keeps adjusting these coordinates so the model gets better at predicting which words appear near a word."),
+        ),
+        About.Page(
+            Bi("背景：看邻居识词", "Background: know a word by its neighbours"),
+            Bi("1957 年，语言学家弗斯提出：看一个词常和哪些词在一起，就能知道它的意思。2013 年，谷歌的米科洛夫等人发布 word2vec：模型只学「预测旁边的词」，却发现 国王 − 男人 + 女人 最接近 王后 —— 空间里的方向本身带上了意义。从此，「把词变成向量」成了几乎所有语言模型的第一步。", "In 1957 the linguist J. R. Firth argued that you can tell what a word means from the words it keeps company with. In 2013 Tomas Mikolov and colleagues at Google released word2vec: a model trained only to predict neighbouring words placed king − man + woman closest to queen — directions in the space themselves carried meaning. Turning words into vectors became the first step of nearly every language model since."),
+        ),
+        About.Page(
+            Bi("核心想法：方向就是关系", "Key idea: directions are relations"),
+            Bi("想象一张地图：从「男人」走到「女人」，要朝某个方向走一段；从「国王」到「王后」，几乎是同一个方向、同样远。所以把这支箭头搬到「国王」上，就落在「王后」附近 —— 类比变成了向量加减：A − B + C ≈ D，四个词围成一个平行四边形。没人教过它「性别」，这个方向是从用法里自己长出来的。", "Think of a map: walking from “man” to “woman” means going some distance in one direction; from “king” to “queen” is almost the same direction and distance. So move that arrow onto “king” and it lands near “queen” — an analogy becomes vector arithmetic: A − B + C ≈ D, four words forming a parallelogram. Nobody taught it “gender”; the direction grew out of how the words are used."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("每个光点 = 一个词，颜色 = 类别，上方的小字牌是词名。光点的位置 = 32 维向量用 PCA 投影到 3-D（只留最主要的 3 个方向），所以看到的距离只是近似，近邻和类比都在 32 维里算。细线 = 5 个最近邻；金色箭头 = 差向量 A − B；平行四边形的第四个角 = A − B + C，带圈的是前 3 名候选。", "Each glowing dot = a word, colour = category, with its name on a small tile above. A dot's position = its 32-number vector projected to 3-D by PCA (keeping the 3 main directions), so the distances you see are approximate; neighbours and analogies are computed in 32-D. Threads = the 5 nearest neighbours; the gold arrow = the difference A − B; the parallelogram's fourth corner = A − B + C, with the top 3 candidates ringed."),
+        ),
+        About.Page(
+            Bi("有多大？今天在哪里？", "How big? Where is it today?"),
+            Bi("这个模型只有 199 个词、32 维，用模板自动造出的句子训练。谷歌 2013 年公开的 word2vec 向量有约 300 万个词和短语、300 维，学自约 1000 亿词的新闻。今天的搜索引擎、推荐系统、AI 助手查资料（「向量检索」），都先把文字、图片变成向量，再找方向最接近的那些。", "This model has just 199 words and 32 dimensions, trained on sentences built from templates. The word2vec vectors Google released in 2013 cover about 3 million words and phrases in 300 dimensions, learned from about 100 billion words of news. Today search engines, recommenders and AI assistants looking things up (“vector search”) first turn text and images into vectors, then find the ones pointing most alike."),
+        ),
+    ))
 
     override val lesson: Lesson by lazy {
         val k = ws.analogy(w("king"), w("man"), w("woman"))

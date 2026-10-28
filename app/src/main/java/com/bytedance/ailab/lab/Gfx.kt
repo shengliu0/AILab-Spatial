@@ -56,7 +56,9 @@ fun tex(img: Image): TextureResource {
     val bmp = Bitmap.createBitmap(img.w, img.h, Bitmap.Config.ARGB_8888)
     bmp.setPremultiplied(false)            // straight alpha, set BEFORE the pixels go in
     bmp.setPixels(img.px, 0, img.w, 0, 0, img.w, img.h)
-    return TextureResource(bmp)
+    // Global: a local texture is released by the SDK when the material that used it switches texture,
+    // and a cached handle reused later crashed setBaseColorTexture ("closed TextureResource").
+    return TextureResource(bmp).also { it.toGlobal() }
 }
 
 fun toModel(d: MeshData): MeshModel {

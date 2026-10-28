@@ -31,7 +31,32 @@ class SpecAdapter {
     private val texCache = IdentityHashMap<Image, TextureResource>()
     private var meshSeq = 0
 
-    fun build(root: Node): Entity { sync(root); return ent[root]!! }
+    /**
+     * Entities for the whole tree, but only SMALL meshes are uploaded now: creating a mesh costs ~17 us per
+     * vertex on the Swan (solar 54k vertices = 0.9 s of frozen main thread). Bigger meshes are queued and
+     * uploaded by [sync] over the next frames within [STREAM_BUDGET_NS], smallest first — the scene and its
+     * panel appear at once and the heavy geometry fades in over ~1 s instead of freezing the volume.
+     */
+    fun build(root: Node): Entity { streaming = true; sync(root); return ent[root]!! }
+
+    private var streaming = false
+    private val pending = ArrayList<Node>()
+    /** Meshes still waiting to be uploaded (0 = scene complete). */
+    val pendingCount: Int get() = pending.size
+
+    private fun flushPending() {
+        if (pending.isEmpty()) return
+        val t0 = System.nanoTime()
+        pending.sortByDescending { it.mesh?.vertexCount ?: 0 }          // smallest at the end: pop from there
+        var first = true
+        while (pending.isNotEmpty()) {
+            if (!first && System.nanoTime() - t0 > STREAM_BUDGET_NS) break
+            val n = pending.removeAt(pending.size - 1); first = false
+            val e = ent[n] ?: continue
+            applyModel(n, e, meshChanged = true, defer = false)
+        }
+        if (pending.isEmpty()) Log.i("SpecAdapter", "streamed meshes complete")
+    }
 
     /** Create entities for new nodes and push every changed property. Main thread. */
     fun sync(root: Node) {
@@ -60,7 +85,7 @@ class SpecAdapter {
             }
             if (s.vis != n.visVersion) { e.enabled = n.visible; s.vis = n.visVersion }
             if (s.tap != n.tapVersion) {
-                if (n.tapRadius > 0f) makeTappable(e, n.tapRadius)
+                if (n.tapRadius > 0f) makeTappable(e, maxOf(n.tapRadius, MIN_TAP_M / worldScale(n)))
                 if (n.billboard && !e.components.has(com.pico.spatial.core.ecs.LookAtComponent::class.java))
                     e.components.set(com.pico.spatial.core.ecs.LookAtComponent().apply {
                         lookAtForwardDirection = com.pico.spatial.core.ecs.LookAtForwardDirection.POSITIVE_Z
@@ -71,19 +96,52 @@ class SpecAdapter {
             for (c in n.children) rec(c, e)
         }
         rec(root, null)
+        streaming = false
+        flushPending()
         flushMeshes()
     }
 
-    private fun applyModel(n: Node, e: Entity, meshChanged: Boolean) {
-        val md = n.mesh; val m = n.mat
-        if (md == null || m == null) { e.components.remove(ModelComponent::class.java); mats.remove(n); return }
+    /**
+     * TEXT QUADS READ RIGHT FROM BOTH SIDES. Overlays (TRANSPARENT / ADD) are double-sided, so a text decal
+     * seen from behind — a billboard the SDK turned the other way, a board the user walked around — showed
+     * its text MIRRORED (users saw it in the chemistry and algebra labs). A textured overlay quad is drawn as
+     * a two-faced twin instead: the original front face plus a back face with u mirrored, each back-face
+     * culled, so whichever side faces the viewer reads correctly.
+     */
+    private val twins = IdentityHashMap<MeshData, MeshData>()
+    private fun isTextQuad(md: MeshData, m: Mat) = md.vertexCount == 4 && md.idx.size == 6 && m is Mat.Unlit && m.tex != null && m.blend != Blend.OPAQUE
+    private fun twinOf(md: MeshData): MeshData = twins.getOrPut(md) { MeshData(FloatArray(24), FloatArray(24), FloatArray(16), IntArray(12)) }.also { fillTwin(md, it) }
+    private fun fillTwin(md: MeshData, t: MeshData) {
+        for (k in 0 until 4) for (c in 0 until 3) {
+            t.pos[k * 3 + c] = md.pos[k * 3 + c]; t.pos[(k + 4) * 3 + c] = md.pos[k * 3 + c]
+            t.nrm[k * 3 + c] = md.nrm[k * 3 + c]; t.nrm[(k + 4) * 3 + c] = -md.nrm[k * 3 + c]
+        }
+        for (k in 0 until 4) {
+            t.uv[k * 2] = md.uv[k * 2]; t.uv[k * 2 + 1] = md.uv[k * 2 + 1]
+            t.uv[(k + 4) * 2] = 1f - md.uv[k * 2]; t.uv[(k + 4) * 2 + 1] = md.uv[k * 2 + 1]
+        }
+        for (i in 0 until 6) t.idx[i] = md.idx[i]
+        for (tri in 0 until 2) {                                   // back face: same triangles, reversed winding
+            t.idx[6 + tri * 3] = md.idx[tri * 3] + 4; t.idx[6 + tri * 3 + 1] = md.idx[tri * 3 + 2] + 4; t.idx[6 + tri * 3 + 2] = md.idx[tri * 3 + 1] + 4
+        }
+    }
+
+    private fun applyModel(n: Node, e: Entity, meshChanged: Boolean, defer: Boolean = streaming) {
+        val m = n.mat
+        val twin = n.mesh != null && m != null && isTextQuad(n.mesh!!, m)
+        val md = n.mesh?.let { if (twin) twinOf(it) else it }
+        if (md == null || m == null) { e.components.remove(ModelComponent::class.java); mats.remove(n); pending.remove(n); return }
+        if (defer && md.vertexCount > STREAM_MIN_VERTS && !meshCache.containsKey(md)) { if (n !in pending) pending += n; return }
+        if (!defer) pending.remove(n)
         val mr = meshCache.getOrPut(md) {
             com.pico.spatial.core.ecs.resource.MeshResource.createWithMeshModel(toModel(md), boundsFor(md), "m${meshSeq++}")
         }
-        val kind = kindOf(m)
+        val kind = kindOf(m) + if (twin) "T" else ""
         val existing = mats[n]
         val mat: Material = if (existing != null && matKind[n] == kind) { update(existing, m); existing }
-                            else create(m).also { mats[n] = it; matKind[n] = kind }
+                            else create(m).also { mats[n] = it; matKind[n] = kind
+                                // each face of a two-faced text quad shows only to its own side
+                                if (twin) (it as UnlitMaterial).setCullingMode(com.pico.spatial.core.ecs.resource.MaterialCullingMode.BACK) }
         val mc = e.components[ModelComponent::class.java]
         if (mc == null || existing !== mat) e.components.set(ModelComponent(mr, mat))
         else if (meshChanged) mc.mesh = mr
@@ -98,7 +156,10 @@ class SpecAdapter {
      * round-robin, at least one per frame: a heavy demo refreshes its geometry less often instead of
      * dropping frames.
      */
-    fun refreshMesh(md: MeshData) { if (meshCache.containsKey(md)) dirty.add(md) }
+    fun refreshMesh(md: MeshData) {
+        twins[md]?.let { t -> fillTwin(md, t); if (meshCache.containsKey(t)) dirty.add(t) }
+        if (meshCache.containsKey(md)) dirty.add(md)
+    }
 
     private val dirty = LinkedHashSet<MeshData>()          // insertion order = round-robin fairness
     private var upN = 0; private var upVerts = 0L; private var upModelNs = 0L; private var upReplaceNs = 0L
@@ -132,6 +193,21 @@ class SpecAdapter {
     private val warned = java.util.Collections.newSetFromMap(IdentityHashMap<Node, Boolean>())
 
     companion object {
+        /** Smallest pinch sphere in WORLD metres. Eye tracking is good to ~1 deg = 4.4 cm at 2.5 m; 4.5 cm
+         *  spheres made users aim twice, so 5.5 cm (~1.3 deg). Neighbours may overlap: the ray then
+         *  picks the sphere whose surface it meets first, i.e. roughly the nearest centre. */
+        const val MIN_TAP_M = 0.055f
+        /** Initial build uploads meshes up to this many vertices at once; bigger ones stream in. */
+        const val STREAM_MIN_VERTS = 600
+        /** Streamed mesh creation allowed per frame. */
+        const val STREAM_BUDGET_NS = 6_000_000L
+
+        private fun worldScale(n: Node): Float {
+            var s = 1f; var c: Node? = n
+            while (c != null) { s *= maxOf(kotlin.math.abs(c.scale.x), kotlin.math.abs(c.scale.y), kotlin.math.abs(c.scale.z)); c = c.parent }
+            return if (s > 1e-6f) s else 1f
+        }
+
         /** Mesh re-upload time allowed per frame (90 Hz frame = 11.1 ms). */
         const val UPLOAD_BUDGET_NS = 3_000_000L
         private val BAD = Regex("[^A-Za-z0-9_]")
@@ -173,6 +249,8 @@ class SpecAdapter {
         is Mat.Pbr -> "P${m.alpha < 0.999f}${m.tex != null}"
     }
 
+    /** Cached texture for [img]. Textures are made GLOBAL in [tex]: a local one is closed by the SDK when its
+     *  material switches texture, and reusing the cached handle crashed setBaseColorTexture. */
     private fun texOf(img: Image?) = img?.let { texCache.getOrPut(it) { tex(it) } }
 
     private fun create(m: Mat): Material = when (m) {

@@ -26,6 +26,7 @@ import com.bytedance.ailab.core.descent.Race
 import com.bytedance.ailab.core.descent.Surfaces
 import com.bytedance.ailab.core.descent.lrIndexOf
 import com.bytedance.ailab.lab.BakeCache
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Lang
 import com.bytedance.ailab.lab.Challenge
@@ -642,6 +643,34 @@ object DescentDemo : SpecDemo() {
     }
 
     // ================================================================ guided track (导学)
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("中间是一块起伏的「地形」，三个发光小球从金色起点往下滚：白球 SGD、橙球「动量」、青球 Adam。面板上的「学习率 η」决定每步迈多大，「梯度噪声」让每步带点随机。右边架子可换 5 种地形，左边是三个球的损失曲线；捏住金色起点针拖动可以换出发点。", "In the middle is a hilly “landscape”; three glowing balls roll down from a gold start pin: white SGD, orange Momentum, cyan Adam. The panel's learning rate η sets how big each step is; gradient noise adds randomness. The shelf on the right swaps between 5 landscapes, the left shows each ball's loss curve, and you can pinch-drag the gold pin to move the start."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("模型里有许多可调的数，叫「参数」。「损失」是一个分数，衡量模型错得有多厉害：越低越好。给参数的每一种取值都算出损失，就得到一张「损失地形」；「训练」就是在这张地形上找最低点。真实网络有上百万个参数，地形就有上百万维；这里只取 2 个参数，才画得成你看得见的山谷。", "A model contains many adjustable numbers called “parameters”. The “loss” is a score for how wrong the model is: lower is better. Give every possible setting of the parameters its loss and you get a “loss landscape”; “training” means finding its lowest point. Real networks have millions of parameters, so millions of dimensions; here we keep just 2, so the valley is something you can see."),
+        ),
+        About.Page(
+            Bi("背景：下山的老办法", "Background: an old way down"),
+            Bi("1847 年，法国数学家柯西为了解天文学里的方程组，提出「梯度下降」：站在任意一点，算出哪个方向最陡，往下迈一小步，再重复。1964 年波利亚克加入「动量」，像一个更重的球；2014 年 Kingma 和 Ba 提出 Adam，给每个方向自动调步长。今天几乎所有神经网络都是这样训练的。", "In 1847 the French mathematician Cauchy, solving systems of equations from astronomy, proposed “gradient descent”: wherever you stand, find the steepest downhill direction, take a small step, repeat. In 1964 Polyak added “momentum”, like a heavier ball; in 2014 Kingma and Ba proposed Adam, which tunes the step for each direction. Almost every neural network today is trained this way."),
+        ),
+        About.Page(
+            Bi("核心想法：蒙眼下山", "Key idea: downhill, blindfolded"),
+            Bi("想象你蒙着眼站在山坡上，只能用脚感觉哪边往下最陡（这就是「梯度」），然后朝那边迈一步，步长就是学习率 η。步子太小，天黑也走不到谷底；步子太大，一脚跨过谷底冲上对面山坡，越弹越高（发散）。动量像一辆有惯性的小车，Adam 像在陡处自动收小步子。", "Imagine standing blindfolded on a hillside, feeling with your feet which way is steepest down (that is the “gradient”), then stepping that way; the step length is the learning rate η. Steps too small and you never reach the bottom; too big and you stride over the valley and up the other side, bouncing higher each time (divergence). Momentum is a cart that keeps rolling; Adam shortens its stride on steep ground."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("板上的两个水平方向 = 两个参数；高度和颜色 = 损失；绿色小环 = 真正的最低点。小球 = 模型此刻的参数，身后的光迹 = 走过的路，前面的箭头 = 下坡方向 −∇f；底下的等高线是从上往下看的地图。左边曲线的纵轴是对数刻度，金线 = 损失 0.001。", "The two horizontal directions on the board = the two parameters; height and colour = the loss; green rings = the true minima. A ball = the model's current parameters, its glowing trail = the path so far, its arrow = the downhill direction −∇f; the contour lines underneath are the map seen from above. On the left the loss curves use a log scale; the gold line = loss 0.001."),
+        ),
+        About.Page(
+            Bi("关键数字 · 今天", "Key numbers · today"),
+            Bi("在碗形峡谷上，陡方向的弯曲度 λ = 10，所以 η 必须小于 2/λ = 0.2，否则小球必然飞出去 —— 这不靠运气，是算得出来的。同样 η = 0.02，动量约 37 步到谷底，SGD 要 180 多步。今天训练聊天机器人、图像识别的大模型，用的多是 Adam 这一族方法，只是参数有数十亿个，而不是 2 个。", "On the quadratic ravine the steep direction has curvature λ = 10, so η must stay below 2/λ = 0.2 or a ball is bound to fly off — not luck, arithmetic. At the same η = 0.02 Momentum reaches the bottom in about 37 steps; SGD needs 180+. Today's chatbots and image recognisers are mostly trained with optimisers of the Adam family — just with billions of parameters instead of 2."),
+        ),
+    ))
+
     override val lesson: Lesson by lazy {
         Lesson(
             listOf(

@@ -26,6 +26,7 @@ import com.bytedance.ailab.core.mlp.Ink
 import com.bytedance.ailab.core.mlp.Mlp
 import com.bytedance.ailab.core.mlp.StrokeRaster
 import com.bytedance.ailab.core.mlp.TopK
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.LabAssets
@@ -998,6 +999,34 @@ object MlpDemo : SpecDemo() {
         }
         if (autoChallenge && hand == null && ghost == null && !penDown && celebrate <= 0f && ink.pointCount == 0 && got.any { !it }) autoWrite(ask())
     }
+
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("左下是手写板：捏住、移动手就能写一个数字（或捏下方的示例 0–9）。它先变成上方 28×28 的灰度图，再一层层传过网络：784 个像素 → 64 个神经元 → 32 个 → 右边 10 根输出条。最亮的金色条就是网络的答案。面板可以加噪声、看权重、重放光波。", "Bottom left is a writing pad: pinch and move your hand to write a digit (or pinch a sample 0–9 below it). It becomes the 28×28 grey image above, then passes through the network layer by layer: 784 pixels → 64 neurons → 32 → the 10 output bars on the right. The brightest, gold bar is the answer. The panel adds noise, shows weights and replays the wave."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("「模型」是一台把输入变成答案的计算机器，这里是：图片进，数字出。机器里有许多可调的旋钮，叫「参数」（也叫权重），这个网络约有 5.3 万个。「训练」就是给它看大量带答案的例子，一点点拧旋钮，让它错得越来越少。没人告诉它 3 长什么样，它是从例子里自己调出来的。", "A “model” is a calculating machine that turns an input into an answer — here, picture in, digit out. Inside are many adjustable knobs called “parameters” (or weights); this network has about 53,000. “Training” means showing it lots of examples with known answers and nudging the knobs so it gets fewer wrong. Nobody tells it what a 3 looks like; it tunes itself from examples."),
+        ),
+        About.Page(
+            Bi("背景：一个老想法", "Background: an old idea"),
+            Bi("1958 年，罗森布拉特造出「感知机」：一层神经元能学会简单的图案，再难一点就不行了。多加几层本可以更强，难题是没人知道中间层的旋钮该怎么调。1986 年，鲁梅尔哈特、辛顿和威廉姆斯推广了「反向传播」，多层网络才真正训练得动。到 1990 年代末，类似的网络已在银行里读支票上的手写数字。", "In 1958 Frank Rosenblatt built the “perceptron”: one layer of neurons that could learn simple patterns, but nothing harder. More layers would be stronger — yet nobody knew how to tune the knobs of the middle layers. In 1986 Rumelhart, Hinton and Williams popularised “backpropagation”, and multi-layer networks became trainable. By the late 1990s similar networks read handwritten digits on bank cheques."),
+        ),
+        About.Page(
+            Bi("核心想法：层层拼图", "Key idea: assemble the pieces"),
+            Bi("每个神经元只是一个数：把上一层所有的数各乘一个权重再相加，负数变成 0（ReLU）。第一层的神经元各自找几段笔画；后面的层把碎片拼成「一个圈」「一条竖」；最后一层看哪些部件到齐了，就投票给哪个数字。就像认人：先看到眼睛、鼻子，再拼成一张脸。", "Each neuron is just one number: multiply every number in the previous layer by a weight, add them up, and turn negatives into 0 (ReLU). First-layer neurons each look for bits of stroke; later layers combine bits into “a loop” or “an upright”; the last layer checks which parts are present and votes for a digit. Like recognising a face: eyes and nose first, then the whole face."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("上方的方块墙 = 网络读到的 784 个像素；每个圆点 = 一个神经元，越亮数值越大；层间的细线 = 「权重 × 激活」最强的那些：蓝线把下一个神经元往上推，红线往下拉；光波 = 一次计算从左传到右。捏一个隐藏神经元，下方出现它的 784 个权重图；捏一根输出条，金线标出支持这个答案的证据链。", "The square wall above = the 784 pixels the network reads; each dot = a neuron, brighter = bigger value; threads between layers = the strongest weight × activity terms: blue pushes the next neuron up, red pulls it down; the wave of light = one computation travelling left to right. Pinch a hidden neuron to see its 784 weights as a map; pinch an output bar and gold threads trace the evidence for that answer."),
+        ),
+        About.Page(
+            Bi("有多大？今天在哪里？", "How big? Where is it today?"),
+            Bi("这是个玩具：约 5.3 万个参数，只在 8 万个电脑合成的数字上训练过，没见过真人笔迹，写得太潦草它也会认错。今天的大模型有上千亿个参数，但最基本的砖块仍是这里的「加权求和 + 非线性」。手机上的手写输入、快递单和支票的识别，都用到这一类网络。", "This is a toy: about 53,000 parameters, trained only on 80,000 computer-generated digits — no real handwriting — so very messy writing can fool it. Today's large models have hundreds of billions of parameters, yet their basic brick is still this “weighted sum + non-linearity”. Handwriting input on phones and the reading of parcel labels and cheques use networks of this kind."),
+        ),
+    ))
 
     override val lesson: Lesson by lazy {
         Lesson(

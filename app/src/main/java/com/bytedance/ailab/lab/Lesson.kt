@@ -53,6 +53,12 @@ class Challenge(
 
 class Lesson(val steps: List<LessonStep>, val challenge: Challenge? = null)
 
+/**
+ * The background card ("📖 背景"): what the experiment is, its story, the idea in plain words, where it
+ * matters today — for a viewer who has never met the topic. A few short pages, each one screen.
+ */
+class About(val pages: List<Page>) { class Page(val title: Bi, val body: Bi) }
+
 /** Runs the current demo's lesson. Compose-observed state; ticked by LabHost (main thread). */
 object LessonRunner {
     enum class Phase { STEP, INSIGHT, CHALLENGE, FINISHED, NONE }

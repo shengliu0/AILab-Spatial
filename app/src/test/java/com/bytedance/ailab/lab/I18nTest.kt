@@ -33,6 +33,11 @@ class I18nTest {
                 val texts = l.steps.flatMap { s -> listOfNotNull(s.say.en, s.insight?.en) + s.options.map { it.en } } + listOfNotNull(l.challenge?.say?.en)
                 texts.filter { cjk.containsMatchIn(it) }.forEach { bad += "${d.id}: CJK in EN lesson text '${it.take(30)}'" }
             }
+            d.about?.let { ab ->
+                ab.pages.flatMap { listOf(it.title.en, it.body.en) }.filter { cjk.containsMatchIn(it) }
+                    .forEach { bad += "${d.id}: CJK in EN background text '${it.take(30)}'" }
+                ab.pages.flatMap { listOf(it.title.zh, it.body.zh) }.filter { it.isBlank() }.forEach { bad += "${d.id}: empty background text" }
+            }
             Lang.set(false)
             d.update(1f / 60f)
             if (!cjk.containsMatchIn(d.readoutText)) bad += "${d.id}: ZH readout has no Chinese — switch did not switch back"

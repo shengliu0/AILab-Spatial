@@ -27,6 +27,7 @@ import com.bytedance.ailab.core.P3
 import com.bytedance.ailab.core.resnet.MlpNet
 import com.bytedance.ailab.core.resnet.ResnetLogs
 import com.bytedance.ailab.core.resnet.Run
+import com.bytedance.ailab.lab.About
 import com.bytedance.ailab.lab.Bi
 import com.bytedance.ailab.lab.Challenge
 import com.bytedance.ailab.lab.LabAssets
@@ -570,6 +571,34 @@ object ResnetDemo : SpecDemo() {
     private var baseProbe = 0
     private fun fin(res: Boolean, d: Int) = logs.run(res, d).loss[EPOCHS]
     private fun finA(res: Boolean, d: Int) = logs.run(res, d).acc[EPOCHS]
+
+    // ---- background card (📖): context for a viewer who has never met this topic
+    override val about = About(listOf(
+        About.Page(
+            Bi("这个实验在做什么？", "What is this experiment?"),
+            Bi("工作台上有两座「层塔」：每一片是网络的一层，底部是输入，顶上的金球是损失。左塔（珊瑚色）是普通网络，右塔（青色）侧面多了跳连弧线。前面的旋钮把两座塔加深到 4、8、16、32、56 层；按 ▶ 回放真实的训练记录，右边看损失曲线和训练后的决策图。捏跳连可以断开它。", "Two “layer towers” stand on the bench: each slab is one layer, the input at the bottom, the loss a gold ball on top. The left tower (coral) is a plain network; the right one (cyan) has skip arcs along its side. The knob in front deepens both to 4, 8, 16, 32 or 56 layers; press ▶ to replay real training logs and watch the loss curves and trained decision maps on the right. Pinch the arcs to cut them."),
+        ),
+        About.Page(
+            Bi("先认识几个词", "A few words first"),
+            Bi("「深度」= 网络叠了多少层。训练靠反向传播：误差从顶上的损失往下传，每层收到一个「梯度」，告诉它该怎么改；梯度太小，这一层就等于没在学。这里的任务是分开两条交缠的螺旋（2000 个点）。只有两类，所以准确率 50% 就等于瞎猜。", "“Depth” = how many layers a network stacks. Training uses backpropagation: the error flows down from the loss at the top, and each layer receives a “gradient” telling it how to change; if the gradient is tiny, that layer is not really learning. The task here is to separate two intertwined spirals (2,000 points). With only two classes, 50 % accuracy means guessing."),
+        ),
+        About.Page(
+            Bi("背景：越深反而越差？", "Background: deeper but worse?"),
+            Bi("2015 年前后，人们发现一件怪事：把普通网络从 20 层加深到 56 层，连训练集上的误差都变高了。这不是死记硬背（过拟合），而是根本学不动，叫「退化」。微软亚洲研究院的何恺明、张祥雨、任少卿和孙剑提出残差网络，用 152 层的网络赢下当年的 ImageNet 比赛，这篇论文成了被引用最多的论文之一。", "Around 2015 researchers noticed something odd: deepening a plain network from 20 to 56 layers made even its training error worse. Not memorising (overfitting) — it simply could not learn; this was called “degradation”. Kaiming He, Xiangyu Zhang, Shaoqing Ren and Jian Sun at Microsoft Research Asia proposed residual networks and won that year's ImageNet contest with 152 layers; the paper became one of the most cited ever."),
+        ),
+        About.Page(
+            Bi("核心想法：给梯度修高速路", "Key idea: a highway for gradients"),
+            Bi("普通网络像传话游戏：一句话经过 56 个人转述，到最后早已面目全非；反过来，误差信号也要逐层相乘，传到底层几乎为零。残差块的输出是 x + F(x)：原话照抄一份，每层只补一点修改。反向时多出的那个「1」，让梯度可以沿跳连直接流到底层。", "A plain network is like a game of telephone: a message re-told by 56 people arrives mangled; backwards, the error signal is multiplied layer after layer and is almost zero by the bottom. A residual block outputs x + F(x): a copy of the original plus a small correction. Backwards, the extra “1” lets the gradient run straight down the skip path to the bottom."),
+        ),
+        About.Page(
+            Bi("怎么看这个 3D 场景", "How to read the 3-D scene"),
+            Bi("每片薄板 = 一层；板上的品红条 = 这一层实测的梯度大小（对数刻度，从 10⁻⁶ 到约 0.3）；从顶上往下跑的光脉冲 = 一次反向传播。青色弧线 = 跳连 x + F(x)；金色探针 = 正在比较的那一层。右边的曲线 = 训练损失随轮数的变化（白线 = 普通 8 层作参照，金色虚线 = 瞎猜水平）；下方两张图 = 训练后各自怎么划分螺旋。", "Each slab = one layer; its magenta bar = that layer's measured gradient size (log scale, from 10⁻⁶ to about 0.3); the pulse running down from the top = one backward pass. Cyan arcs = skips x + F(x); the gold probe = the layer being compared. On the right, curves = training loss over the epochs (white = plain-8 for reference, gold dashes = guessing); the two maps below = how each trained net splits the spirals."),
+        ),
+        About.Page(
+            Bi("关键数字 · 今天", "Key numbers · today"),
+            Bi("记录是真的：56 层普通网络训练 60 轮，准确率只有 51%（等于瞎猜），第 1 层梯度约 4×10⁻⁷；加上跳连的 56 层准确率 99%，第 1 层梯度约 0.1，大了二十多万倍。这里每层只有 32 个神经元，ResNet-152 则有约 6000 万参数。今天的 Transformer（ChatGPT 的骨架）每一层都带同样的跳连。", "These are real logs: after 60 epochs the plain 56-layer net reaches only 51 % accuracy (a coin flip) and its first-layer gradient is about 4×10⁻⁷; with skips the 56-layer net reaches 99 % and its first-layer gradient is about 0.1 — over 200,000 times larger. Each layer here has just 32 neurons; ResNet-152 has about 60 million parameters. Today's Transformers (the backbone of ChatGPT) carry the same skips in every layer."),
+        ),
+    ))
 
     override val lesson: Lesson by lazy {
         val p8 = "%.3f".format(fin(false, 8)); val p56 = "%.3f".format(fin(false, 56)); val r56 = "%.3f".format(fin(true, 56))

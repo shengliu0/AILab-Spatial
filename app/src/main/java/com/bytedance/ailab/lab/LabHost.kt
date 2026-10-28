@@ -68,6 +68,9 @@ interface Demo {
 
     /** The guided track (导学) for this demo, or null. Build it ONCE (`by lazy`): steps capture demo state. */
     val lesson: Lesson? get() = null
+
+    /** The background card (📖), or null. */
+    val about: About? get() = null
 }
 
 object LabHost {
@@ -94,10 +97,12 @@ object LabHost {
         // whose content went to zero size did not come back (other demos showed no panel at all)
         controlsEntity?.enabled = !open
         lessonEntity?.enabled = !open && LessonRunner.phase != LessonRunner.Phase.NONE
+        aboutEntity?.enabled = !open
         if (open) hideLabels()
     }
     var controlsEntity: Entity? = null
     var lessonEntity: Entity? = null
+    var aboutEntity: Entity? = null
 
     // ---- drag routing ----
     private var dragName: String? = null
@@ -110,7 +115,8 @@ object LabHost {
         draggedSincePinch = true
         val d = current ?: return
         if (name != null && dragName == null) { dragName = name; d.onDragStart(name) }
-        dragName?.let { d.onDrag(it, dx, dy, dz) }
+        val k = 1f / LabSettings.scale                     // hand metres -> scene metres (stage is scaled)
+        dragName?.let { d.onDrag(it, dx * k, dy * k, dz * k) }
     }
     fun onDragEnd() { dragName?.let { current?.onDragEnd(it) }; dragName = null }
 
@@ -138,7 +144,70 @@ object LabHost {
 
     fun register(list: List<Demo>) { demos = list }
 
-    fun attach(stageEntity: Entity, context: DemoContext) { stage = stageEntity; ctx = context }
+    fun attach(stageEntity: Entity, context: DemoContext) { stage = stageEntity; ctx = context; applyScale(); rotationProbe(stageEntity) }
+
+    /**
+     * Device check of the rotation convention: a child entity rotated +90 deg about Y (then about X) by the
+     * same path SpecAdapter uses; the SDK reports where its local +X axis lands in stage space. Right-handed
+     * expectation (our Q.rotate, SoftRender): Y+90 maps +X -> (0, 0, -1); X+90 maps +Y -> (0, 0, 1).
+     */
+    private fun rotationProbe(s: Entity) {
+        runCatching {
+            val h = (Math.PI / 4).toFloat()
+            for ((name, q, local) in listOf(
+                Triple("Y+90 of +X", com.pico.spatial.core.math.Quat(0f, kotlin.math.sin(h), 0f, kotlin.math.cos(h)), Vector3(1f, 0f, 0f)),
+                Triple("X+90 of +Y", com.pico.spatial.core.math.Quat(kotlin.math.sin(h), 0f, 0f, kotlin.math.cos(h)), Vector3(0f, 1f, 0f)))) {
+                val e = Entity().apply { setName("RotProbe") }
+                s.addChild(e)
+                e.components[TransformComponent::class.java]?.quaternion = q
+                val w = e.convertPositionTo(local, s)
+                val ours = Q(q.x, q.y, q.z, q.w).rotate(floatArrayOf(local.x, local.y, local.z))
+                Log.i(TAG, "ROTPROBE $name: sdk (%.2f, %.2f, %.2f) vs ours (%.2f, %.2f, %.2f)".format(w.x, w.y, w.z, ours[0], ours[1], ours[2]))
+                s.removeChild(e); e.destroy(true)
+            }
+        }.onFailure { Log.w(TAG, "ROTPROBE failed", it) }
+    }
+
+    /** Billboard probe: an entity with the same LookAtComponent SpecAdapter gives billboards; after a few frames
+     *  log where its local +Z points (stage space) and the stage-space position of the viewer it looks at. */
+    private var bbProbe: Entity? = null
+    private var bbT = 0f
+    private fun billboardProbe(dt: Float) {
+        val s = stage ?: return
+        if (bbProbe == null && bbT == 0f) {
+            bbProbe = Entity().apply {
+                setName("BbProbe")
+                components.set(com.pico.spatial.core.ecs.LookAtComponent().apply {
+                    lookAtForwardDirection = com.pico.spatial.core.ecs.LookAtForwardDirection.POSITIVE_Z
+                    setViewerAsTarget()
+                })
+            }
+            s.addChild(bbProbe!!)
+        }
+        bbT += dt
+        val e = bbProbe ?: return
+        if (bbT > 3f) {
+            runCatching {
+                val o = e.convertPositionTo(Vector3(0f, 0f, 0f), s); val z = e.convertPositionTo(Vector3(0f, 0f, 1f), s)
+                Log.i(TAG, "BBPROBE local +Z in stage = (%.2f, %.2f, %.2f)  [+z toward the default viewer = text readable]".format(z.x - o.x, z.y - o.y, z.z - o.z))
+            }.onFailure { Log.w(TAG, "BBPROBE failed", it) }
+            s.removeChild(e); e.destroy(true); bbProbe = null; bbT = -1e9f
+        }
+    }
+
+    /** Scale the whole scene about the volume centre (LabSettings.scale); labels and notes follow in [tick]. */
+    fun applyScale() {
+        val k = LabSettings.scale
+        stage?.components?.get(TransformComponent::class.java)?.scaleVector = Vector3(k, k, k)
+    }
+
+    /**
+     * Recently shown demos stay built (disabled) so going back is instant: building = creating every
+     * entity and uploading every mesh on the main thread (~17 us/vertex on the Swan, up to ~1 s).
+     * The current demo plus [WARM_MAX] parked ones; the oldest is destroyed beyond that.
+     */
+    private const val WARM_MAX = 2
+    private val warm = LinkedHashMap<String, Pair<Demo, Entity>>()
 
     val demo: Demo? get() = current
     /** The persistent entity all demo roots hang under (= volume space). */
@@ -153,18 +222,25 @@ object LabHost {
         loading = true
         try {
             hideLabels(); toastLeft = 0f; toastEntity?.enabled = false
-            currentRoot?.let { r -> s.removeChild(r); r.destroy(true) }
-            current?.dispose()
+            Narrator.stop()
+            val prev = current; val prevRoot = currentRoot
+            if (prev != null && prevRoot != null) { prevRoot.enabled = false; warm.remove(prev.id); warm[prev.id] = prev to prevRoot }
             current = null; currentRoot = null
             val t0 = System.nanoTime()
-            val root = next.build(c)
-            s.addChild(root)
+            val parked = warm.remove(next.id)
+            val root = if (parked != null) parked.second.also { it.enabled = true }
+                       else next.build(c).also { s.addChild(it) }
+            while (warm.size > WARM_MAX) {
+                val oldest = warm.keys.first(); val (od, oe) = warm.remove(oldest)!!
+                s.removeChild(oe); oe.destroy(true); od.dispose()
+                Log.i(TAG, "evicted warm demo $oldest")
+            }
             current = next; currentRoot = root; checked = false; sinceBuild = 0f
             fpsN = 0; fpsT = 0f; fpsWorst = 0f; workWorst = 0f
             currentId = next.id
             LessonRunner.start(next.lesson) { node -> current?.flash(node) }
             lessonEntity?.enabled = !catalogOpen && LessonRunner.phase != LessonRunner.Phase.NONE
-            Log.i(TAG, "demo ${next.id} up in ${"%.0f".format((System.nanoTime() - t0) / 1e6)} ms")
+            Log.i(TAG, "demo ${next.id} up in ${"%.0f".format((System.nanoTime() - t0) / 1e6)} ms${if (parked != null) " (warm)" else ""}")
         } catch (e: Exception) {
             Log.e(TAG, "demo $id failed to build", e)
         } finally {
@@ -180,6 +256,7 @@ object LabHost {
         if (loading) return
         tickToast(dt)
         LessonRunner.tick(dt)
+        billboardProbe(dt)
         val t0 = System.nanoTime()
         d.tick(dt)
         val work = (System.nanoTime() - t0) / 1e6f
@@ -196,7 +273,8 @@ object LabHost {
             val on = l != null && l.visible && l.text.isNotEmpty()
             if (e.enabled != on) e.enabled = on
             if (l != null && on) {
-                e.components[TransformComponent::class.java]?.position = Vector3(l.pos.x, l.pos.y, l.pos.z)
+                val k = LabSettings.scale
+                e.components[TransformComponent::class.java]?.position = Vector3(l.pos.x * k, l.pos.y * k, l.pos.z * k)
                 if (labelText[i] != l.text) labelText[i] = l.text
             }
         }
@@ -233,7 +311,8 @@ object LabHost {
         if (msg != null && at != null) {
             toastText = msg; toastLeft = TOAST_S
             toastEntity?.let { e ->
-                e.components[TransformComponent::class.java]?.position = Vector3(at[0], at[1], at[2])
+                val k = LabSettings.scale
+                e.components[TransformComponent::class.java]?.position = Vector3(at[0] * k, at[1] * k, at[2] * k)
                 e.enabled = !catalogOpen
             }
         }
